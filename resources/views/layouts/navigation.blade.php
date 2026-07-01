@@ -80,6 +80,12 @@
             'active' => request()->is('summary') || request()->is('flocks/*/summary'),
             'icon' => 'M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14H4Zm4-3h2V8H8v8Zm4 0h2v-5h-2v5Zm4 0h2V6h-2v10Z',
         ],
+        [
+            'label' => 'รายงานสูญเสียรายวัน',
+            'href' => route('losses.shortcut'),
+            'active' => request()->is('losses') || request()->is('flocks/*/losses'),
+            'icon' => 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z',
+        ],
     ];
 
     if (auth()->user()->isSuperAdmin()) {

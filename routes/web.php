@@ -127,6 +127,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/flocks/{flock}/water-meters', [WaterMeterRecordController::class, 'index'])->name('flocks.water-meters.index');
     Route::post('/flocks/{flock}/water-meters', [WaterMeterRecordController::class, 'store'])->name('flocks.water-meters.store');
     Route::get('/flocks/{flock}/summary', FlockSummaryController::class)->name('flocks.summary');
+    Route::get('/flocks/{flock}/losses', \App\Http\Controllers\FlockLossReportController::class)->name('flocks.losses');
+    Route::get('/losses', function () {
+        $flock = FarmAccess::activeFlockFor(request()->user());
+        if (! $flock) {
+            return redirect()
+                ->route('flocks.index')
+                ->with('status', 'กรุณาเปิดรุ่นการเลี้ยงก่อนดูรายงานการสูญเสียรายวัน');
+        }
+        return redirect()->route('flocks.losses', $flock);
+    })->name('losses.shortcut');
     Route::get('/flocks/{flock}/weight-records', [WeightRecordController::class, 'index'])->name('flocks.weight-records.index');
     Route::post('/flocks/{flock}/weight-records', [WeightRecordController::class, 'store'])->name('flocks.weight-records.store');
     Route::resource('flocks', FlockController::class);

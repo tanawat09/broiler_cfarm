@@ -1,0 +1,50 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: broiler-app
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: Broiler
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      APP_LOCALE: th
+      APP_FALLBACK_LOCALE: th
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: broiler
+      DB_USERNAME: broiler
+      DB_PASSWORD: broiler_password
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      MAIL_MAILER: log
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:11.4
+    container_name: broiler-db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MARIADB_DATABASE: broiler
+      MARIADB_USER: broiler
+      MARIADB_PASSWORD: broiler_password
+      MARIADB_ROOT_PASSWORD: root_password
+    volumes:
+      - broiler-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  broiler-db-data:

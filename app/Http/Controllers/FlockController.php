@@ -96,6 +96,13 @@ class FlockController extends Controller
             return $flock;
         });
 
+        $redirectTo = $request->input('redirect_to');
+        if ($redirectTo === 'placements') {
+            return redirect()
+                ->route('flocks.placements.index', $flock)
+                ->with('status', 'เปิดรุ่นการเลี้ยงเรียบร้อยแล้ว');
+        }
+
         return redirect()
             ->route('flocks.show', $flock)
             ->with('status', 'เปิดรุ่นการเลี้ยงเรียบร้อยแล้ว');

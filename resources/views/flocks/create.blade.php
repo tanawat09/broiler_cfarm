@@ -15,6 +15,7 @@
             @else
                 <div class="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
                     <form method="POST" action="{{ route('flocks.store') }}">
+                        <input type="hidden" name="redirect_to" value="{{ request('redirect_to') }}">
                         @include('flocks._form')
                     </form>
                 </div>

@@ -332,5 +332,6 @@ class DatabaseSeeder extends Seeder
         });
 
         $this->call(FeedIntakeMasterSeeder::class);
+        $this->call(FeedPriceMasterSeeder::class);
     }
 }

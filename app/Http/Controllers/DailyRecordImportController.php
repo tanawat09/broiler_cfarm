@@ -67,9 +67,17 @@ class DailyRecordImportController extends Controller
         $errorCount = 0;
 
         $flockHouseStarts = $flock->flockHouseStarts()->with('house')->get();
+        $placements = $flock->flockHousePlacements()->get();
         $houseMap = [];
+        $houseStartsMap = [];
+        $placementsMap = [];
+
         foreach ($flockHouseStarts as $start) {
             $houseMap[$start->house->house_no] = $start->house_id;
+            $houseStartsMap[$start->house_id] = $start;
+        }
+        foreach ($placements as $p) {
+            $placementsMap[$p->house_id] = $p;
         }
 
         try {
@@ -81,19 +89,64 @@ class DailyRecordImportController extends Controller
 
                 $fileHouseCode = trim($row[2]);
                 $houseNo = (int)substr($fileHouseCode, -2);
-
-                if (!isset($houseMap[$houseNo])) {
-                    $skipCount++;
-                    continue;
-                }
-
-                $houseId = $houseMap[$houseNo];
                 $ageDay = (int) $row[6];
                 $recordDate = trim($row[7]);
 
                 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $recordDate)) {
                     $errorCount++;
                     continue;
+                }
+
+                // คำนวณวันเริ่มเลี้ยงของเล้านี้จาก record_date และ age_day
+                $daysToSubtract = max(0, $ageDay - 1);
+                $calculatedStartDate = \Carbon\CarbonImmutable::parse($recordDate)->subDays($daysToSubtract)->toDateString();
+
+                // หากยังไม่มีเล้านี้ในระบบรุ่นเลี้ยง ให้สร้างอัตโนมัติ
+                if (!isset($houseMap[$houseNo])) {
+                    $house = $flock->farm->houses()->where('house_no', $houseNo)->first();
+                    if ($house) {
+                        $newStart = \App\Models\FlockHouseStart::create([
+                            'flock_id' => $flock->id,
+                            'house_id' => $house->id,
+                            'initial_birds' => 0,
+                            'start_date' => $calculatedStartDate,
+                        ]);
+                        $newPlacement = \App\Models\FlockHousePlacement::create([
+                            'flock_id' => $flock->id,
+                            'house_id' => $house->id,
+                            'placement_date' => $calculatedStartDate,
+                            'chicks_in' => 0,
+                            'male_count' => 0,
+                            'female_count' => 0,
+                            'male_grade_a_count' => 0,
+                            'male_grade_b_count' => 0,
+                            'female_grade_a_count' => 0,
+                            'female_grade_b_count' => 0,
+                        ]);
+
+                        $houseMap[$houseNo] = $house->id;
+                        $houseStartsMap[$house->id] = $newStart;
+                        $placementsMap[$house->id] = $newPlacement;
+                    } else {
+                        $skipCount++;
+                        continue;
+                    }
+                }
+
+                $houseId = $houseMap[$houseNo];
+
+                // อัปเดต start_date ของเล้าหากยังไม่ตรง
+                $startObj = $houseStartsMap[$houseId] ?? null;
+                if ($startObj && (!$startObj->start_date || $startObj->start_date->toDateString() !== $calculatedStartDate)) {
+                    $startObj->update(['start_date' => $calculatedStartDate]);
+                    $startObj->start_date = \Carbon\CarbonImmutable::parse($calculatedStartDate);
+                }
+
+                // อัปเดต placement_date ของข้อมูลลูกไก่หากยังไม่ตรง
+                $placementObj = $placementsMap[$houseId] ?? null;
+                if ($placementObj && (!$placementObj->placement_date || $placementObj->placement_date->toDateString() !== $calculatedStartDate)) {
+                    $placementObj->update(['placement_date' => $calculatedStartDate]);
+                    $placementObj->placement_date = \Carbon\CarbonImmutable::parse($calculatedStartDate);
                 }
 
                 $exists = DailyHouseRecord::where('flock_id', $flock->id)
@@ -142,12 +195,24 @@ class DailyRecordImportController extends Controller
             fclose($handle);
         }
 
+        // อัปเดต start_date ของรุ่นเลี้ยงภาพรวมให้เป็นวันที่เริ่มของเล้าที่เร็วที่สุด
+        $earliestStartDate = $flock->flockHouseStarts()->whereNotNull('start_date')->min('start_date');
+        if ($earliestStartDate && $flock->start_date->toDateString() !== $earliestStartDate) {
+            $flock->update(['start_date' => $earliestStartDate]);
+        }
+
         $message = "นำเข้าข้อมูลประจำวันเรียบร้อยแล้ว {$successCount} รายการ";
         if ($skipCount > 0) {
             $message .= " (ข้ามรายการซ้ำ/ไม่พบเล้า {$skipCount} รายการ)";
         }
         if ($errorCount > 0) {
             $message .= " (พบบรรทัดชำรุด {$errorCount} รายการ)";
+        }
+
+        // หากยังไม่ได้ป้อนข้อมูลจำนวนลูกไก่เข้าเลี้ยง (มีค่าเริ่มต้น 0 ตัว) ให้แจ้งเตือนผู้ใช้ด้วย
+        $hasZeroInitialBirds = $flock->flockHouseStarts()->where('initial_birds', 0)->exists();
+        if ($hasZeroInitialBirds) {
+            $message .= " *** คำแนะนำ: กรุณาไปป้อนจำนวนตัวผู้/เมียในหน้า 'ข้อมูลลูกไก่' เพื่อให้ระบบคำนวณอัตราสูญเสียและ FCR ทำงานได้สมบูรณ์";
         }
 
         return redirect()->route('flocks.daily-records.show', [$flock, $recordDate ?: now()->toDateString()])

@@ -6,7 +6,10 @@
                 <p class="mt-1 text-sm text-gray-600">จัดการข้อมูลฟาร์มสำหรับระบบบันทึกการเลี้ยงไก่เนื้อ</p>
             </div>
             @if (auth()->user()->isSuperAdmin())
-                <a href="{{ route('farms.create') }}" class="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
+                <a href="{{ route('farms.create') }}" class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 transition-all duration-200 transform hover:-translate-y-0.5">
+                    <svg class="h-4 w-4 text-white/80 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
                     เพิ่มฟาร์ม
                 </a>
             @endif

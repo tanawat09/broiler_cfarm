@@ -279,17 +279,34 @@ class DashboardController extends Controller
             $birdsPerSqm = $totalArea > 0 ? round($initialBirds / $totalArea, 2) : 0;
 
             // Calculate Standard and Comparison metrics
-            $age = (float) ($dailyAggregates->max('age_day') ?: 0);
-            
-            $actualFeed = $initialBirds > 0 ? ($totalFeedUsed * 1000) / $initialBirds : 0.0;
-            $actualSurvival = $initialBirds > 0 ? ($remainingBirds / $initialBirds) * 100 : 0.0;
-            $actualWeight = $latestWeight !== null ? $latestWeight : 0.0;
-            $actualFcr = $fcr !== null ? $fcr : 0.0;
-            
-            $actualPi = 0.0;
-            if ($actualFcr > 0 && $age > 0) {
-                $actualPi = ($actualSurvival * $actualWeight) / ($age * $actualFcr) * 100;
+            $saleRecords = FlockSaleRecord::where('flock_id', $flock->id)
+                ->when($selectedHouseId, fn($query) => $query->where('house_id', $selectedHouseId))
+                ->get();
+
+            $totalBirdsSold = (int) $saleRecords->sum('birds_sold');
+            $totalWeightSold = (float) $saleRecords->sum('total_weight');
+
+            if ($saleRecords->isNotEmpty()) {
+                $weightedAgeSum = 0.0;
+                foreach ($saleRecords as $sr) {
+                    $days = $flock->start_date->diffInDays($sr->sale_date);
+                    $weightedAgeSum += $days * $sr->birds_sold;
+                }
+                $age = $totalBirdsSold > 0 ? $weightedAgeSum / $totalBirdsSold : (float) ($dailyAggregates->max('age_day') ?: 0);
+            } else {
+                $age = (float) ($dailyAggregates->max('age_day') ?: 0);
             }
+
+            $dPrev = (int) floor($age);
+            $dNext = (int) ceil($age);
+            if ($dNext === $dPrev) {
+                $dNext = $dPrev + 1; // standard interval is 1 day
+            }
+            $fraction = $age - $dPrev;
+
+            // Load feed intake master table
+            $stdPrev = $feedIntakes->get($dPrev);
+            $stdNext = $feedIntakes->get($dNext) ?? $stdPrev;
 
             // Determine gender for lookup
             $sex = 'ah';
@@ -302,63 +319,130 @@ class DashboardController extends Controller
                 }
             }
 
-            // Compute standard (STD) values
-            $stdFeed = (float) \App\Models\FeedIntakeMaster::where('age', '<=', (int)$age)->sum('feed_' . $sex);
-            $stdSurvival = max(0.0, 100.0 - (0.1076 * $age));
+            // Actual values
+            $actualSurvival = $initialBirds > 0 ? (($remainingBirds + $totalBirdsSold) / $initialBirds) * 100 : 0.0;
+            $actualFeed = $initialBirds > 0 ? ($totalFeedUsed * 1000) / $initialBirds : 0.0;
             
-            if ($sex === 'male') {
-                $stdWeight = 0.0014 * pow($age, 2) + 0.018 * $age + 0.042;
-            } elseif ($sex === 'female') {
-                $stdWeight = 0.0012 * pow($age, 2) + 0.0195 * $age + 0.042;
-            } else {
-                $stdWeight = 0.0013 * pow($age, 2) + 0.0188 * $age + 0.042;
+            $actualWeightKg = $totalBirdsSold > 0 ? $totalWeightSold / $totalBirdsSold : ($latestWeight ?: 0.0);
+            $actualWeight = $actualWeightKg * 1000;
+
+            $totalWeightProduced = ($remainingBirds * $actualWeightKg) + $totalWeightSold;
+            $actualFcr = $totalWeightProduced > 0 ? $totalFeedUsed / $totalWeightProduced : 0.0;
+
+            $actualPi = 0.0;
+            if ($actualFcr > 0 && $age > 0) {
+                $actualPi = ($actualSurvival * $actualWeightKg) / ($age * $actualFcr) * 100;
             }
-            
-            $stdFcr = 0.021 * $age + 0.845;
-            $stdPi = ($stdFcr > 0 && $age > 0) ? ($stdSurvival * $stdWeight) / ($age * $stdFcr) * 100 : 0.0;
+
+            // STD values (Prev, Next, Delta, Interpolated)
+            $interpolate = function ($valPrev, $valNext, $frac, $isPi = false) {
+                if ($valPrev === null || $valNext === null) {
+                    return 0.0;
+                }
+                if ($isPi) {
+                    return $valPrev + (($valPrev - $valNext) * $frac);
+                }
+                return $valPrev + (($valNext - $valPrev) * $frac);
+            };
+
+            // Liveability
+            $stdPrevSurvival = 100.0 - (float) ($stdPrev?->{'mortality_' . $sex} ?? 0.0);
+            $stdNextSurvival = 100.0 - (float) ($stdNext?->{'mortality_' . $sex} ?? 0.0);
+            $deltaSurvival = $stdNextSurvival - $stdPrevSurvival;
+            $stdSurvival = $interpolate($stdPrevSurvival, $stdNextSurvival, $fraction);
+
+            // Feed Intake
+            $stdPrevFeed = (float) ($stdPrev?->{'cum_feed_' . $sex} ?? 0.0);
+            $stdNextFeed = (float) ($stdNext?->{'cum_feed_' . $sex} ?? 0.0);
+            $deltaFeed = $stdNextFeed - $stdPrevFeed;
+            $stdFeed = $interpolate($stdPrevFeed, $stdNextFeed, $fraction);
+
+            // Body Weight
+            $stdPrevWeight = (float) ($stdPrev?->{'weight_' . $sex} ?? 0.0);
+            $stdNextWeight = (float) ($stdNext?->{'weight_' . $sex} ?? 0.0);
+            $deltaWeight = $stdNextWeight - $stdPrevWeight;
+            $stdWeight = $interpolate($stdPrevWeight, $stdNextWeight, $fraction);
+
+            // FCR
+            $stdPrevFcr = (float) ($stdPrev?->{'fcr_' . $sex} ?? 0.0);
+            $stdNextFcr = (float) ($stdNext?->{'fcr_' . $sex} ?? 0.0);
+            $deltaFcr = $stdNextFcr - $stdPrevFcr;
+            $stdFcr = $interpolate($stdPrevFcr, $stdNextFcr, $fraction);
+
+            // PI
+            $stdPrevPi = (float) ($stdPrev?->{'pi_' . $sex} ?? 0.0);
+            $stdNextPi = (float) ($stdNext?->{'pi_' . $sex} ?? 0.0);
+            $deltaPi = $stdPrevPi - $stdNextPi;
+            $stdPi = $interpolate($stdPrevPi, $stdNextPi, $fraction, true);
 
             // Compute %STD percentages
-            $feedPct = $stdFeed > 0 ? ($actualFeed / $stdFeed) * 100 : 0.0;
             $survivalPct = $stdSurvival > 0 ? ($actualSurvival / $stdSurvival) * 100 : 0.0;
+            $feedPct = $stdFeed > 0 ? ($actualFeed / $stdFeed) * 100 : 0.0;
             $weightPct = $stdWeight > 0 ? ($actualWeight / $stdWeight) * 100 : 0.0;
             $fcrPct = $actualFcr > 0 ? ($stdFcr / $actualFcr) * 100 : 0.0;
             $piPct = $stdPi > 0 ? ($actualPi / $stdPi) * 100 : 0.0;
 
             $comparisonTable = [
                 'age' => [
-                    'label' => 'อายุ',
+                    'label' => 'อายุ (วัน)',
                     'actual' => number_format($age, 2),
-                    'std' => '-',
+                    'std_prev_day' => $dPrev,
+                    'std_next_day' => $dNext,
+                    'std_prev' => number_format($dPrev, 0),
+                    'std_next' => number_format($dNext, 0),
+                    'delta' => number_format($dNext - $dPrev, 2),
+                    'fraction' => number_format($fraction, 2),
+                    'std_interpolated' => number_format($age, 2),
                     'pct' => '-'
                 ],
-                'feed' => [
-                    'label' => 'อาหาร',
-                    'actual' => number_format($actualFeed, 0),
-                    'std' => number_format($stdFeed, 0),
-                    'pct' => number_format($feedPct, 2) . '%'
-                ],
-                'survival' => [
-                    'label' => 'เลี้ยงรอด(%)',
+                'liveability' => [
+                    'label' => 'Liveability (%)',
                     'actual' => number_format($actualSurvival, 2),
-                    'std' => number_format($stdSurvival, 2),
+                    'std_prev' => number_format($stdPrevSurvival, 2),
+                    'std_next' => number_format($stdNextSurvival, 2),
+                    'delta' => number_format($deltaSurvival, 2),
+                    'fraction' => number_format($fraction, 2),
+                    'std_interpolated' => number_format($stdSurvival, 2),
                     'pct' => number_format($survivalPct, 2) . '%'
                 ],
+                'feed' => [
+                    'label' => 'FI (กรัม/ตัว)',
+                    'actual' => number_format($actualFeed, 0),
+                    'std_prev' => number_format($stdPrevFeed, 0),
+                    'std_next' => number_format($stdNextFeed, 0),
+                    'delta' => number_format($deltaFeed, 2),
+                    'fraction' => number_format($fraction, 2),
+                    'std_interpolated' => number_format($stdFeed, 1),
+                    'pct' => number_format($feedPct, 2) . '%'
+                ],
                 'weight' => [
-                    'label' => 'นน.เฉลี่ย',
-                    'actual' => number_format($actualWeight, 3),
-                    'std' => number_format($stdWeight, 3),
+                    'label' => 'BW (กรัม/ตัว)',
+                    'actual' => number_format($actualWeight, 0),
+                    'std_prev' => number_format($stdPrevWeight, 0),
+                    'std_next' => number_format($stdNextWeight, 0),
+                    'delta' => number_format($deltaWeight, 2),
+                    'fraction' => number_format($fraction, 2),
+                    'std_interpolated' => number_format($stdWeight, 1),
                     'pct' => number_format($weightPct, 2) . '%'
                 ],
                 'fcr' => [
                     'label' => 'FCR',
                     'actual' => number_format($actualFcr, 3),
-                    'std' => number_format($stdFcr, 3),
+                    'std_prev' => number_format($stdPrevFcr, 3),
+                    'std_next' => number_format($stdNextFcr, 3),
+                    'delta' => number_format($deltaFcr, 3),
+                    'fraction' => number_format($fraction, 2),
+                    'std_interpolated' => number_format($stdFcr, 3),
                     'pct' => number_format($fcrPct, 2) . '%'
                 ],
                 'pi' => [
                     'label' => 'PI',
                     'actual' => number_format($actualPi, 0),
-                    'std' => number_format($stdPi, 0),
+                    'std_prev' => number_format($stdPrevPi, 0),
+                    'std_next' => number_format($stdNextPi, 0),
+                    'delta' => number_format($deltaPi, 2),
+                    'fraction' => number_format($fraction, 2),
+                    'std_interpolated' => number_format($stdPi, 1),
                     'pct' => number_format($piPct, 2) . '%'
                 ],
             ];
@@ -379,6 +463,7 @@ class DashboardController extends Controller
                     'remainingBirds' => $remainingBirds,
                     'mortality' => $totalLoss,
                     'mortalityRate' => $mortalityRate,
+                    'survivalRate' => $actualSurvival,
                     'totalFeedConsumed' => $totalFeedUsed,
                     'fcr' => $fcr,
                 ],

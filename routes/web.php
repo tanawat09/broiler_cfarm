@@ -112,6 +112,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('chick-price-masters', ChickPriceMasterController::class)->only(['index', 'store', 'destroy']);
     Route::resource('sale-price-masters', SalePriceMasterController::class)->only(['index', 'store', 'destroy']);
     Route::resource('feed-intake-masters', FeedIntakeMasterController::class)->only(['index', 'store', 'destroy']);
+    Route::resource('feed-price-masters', \App\Http\Controllers\FeedPriceMasterController::class)->only(['index', 'store', 'destroy']);
     Route::resource('feed-receipts', FeedReceiptController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
     Route::resource('/flocks/{flock}/sale-records', FlockSaleRecordController::class)
         ->names('flocks.sale-records')
@@ -137,6 +138,22 @@ Route::middleware('auth')->group(function () {
         }
         return redirect()->route('flocks.losses', $flock);
     })->name('losses.shortcut');
+    Route::get('/flocks/{flock}/feed-summary', \App\Http\Controllers\FlockFeedSummaryController::class)->name('flocks.feed-summary');
+    Route::get('/feed-summary', function () {
+        $flock = FarmAccess::activeFlockFor(request()->user());
+        if (! $flock) {
+            return redirect()
+                ->route('flocks.index')
+                ->with('status', 'กรุณาเปิดรุ่นการเลี้ยงก่อนดูสรุปการใช้อาหาร');
+        }
+        return redirect()->route('flocks.feed-summary', $flock);
+    })->name('feed-summary.shortcut');
+    Route::get('/flocks/{flock}/placements', [\App\Http\Controllers\FlockPlacementController::class, 'index'])->name('flocks.placements.index');
+    Route::post('/flocks/{flock}/placements', [\App\Http\Controllers\FlockPlacementController::class, 'store'])->name('flocks.placements.store');
+    Route::get('/placements', [\App\Http\Controllers\FlockPlacementController::class, 'shortcut'])->name('placements.shortcut');
+    Route::get('/placements/create-flock', [\App\Http\Controllers\FlockPlacementController::class, 'createFlockForm'])->name('placements.create-flock-form');
+    Route::post('/placements/create-flock', [\App\Http\Controllers\FlockPlacementController::class, 'createFlock'])->name('placements.create-flock');
+
     Route::get('/flocks/{flock}/weight-records', [WeightRecordController::class, 'index'])->name('flocks.weight-records.index');
     Route::post('/flocks/{flock}/weight-records', [WeightRecordController::class, 'store'])->name('flocks.weight-records.store');
     Route::resource('flocks', FlockController::class);

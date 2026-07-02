@@ -33,7 +33,7 @@
                     <div>
                         <x-input-label for="flock_selector" value="เลือกรุ่น" />
                         <select id="flock_selector" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                            @foreach ($flockOptions->where('farm_id', $flock->farm_id) as $option)
+                            @foreach ($flockOptions as $option)
                                 <option
                                     value="{{ $option->id }}"
                                     data-farm-id="{{ $option->farm_id }}"

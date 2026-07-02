@@ -76,7 +76,7 @@
                         <div>
                             <x-input-label for="flock_selector" value="เลือกรุ่นการเลี้ยง" class="text-xs font-semibold uppercase tracking-wider text-slate-500" />
                             <select id="flock_selector" class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-emerald-500 focus:ring focus:ring-emerald-200 focus:ring-opacity-50">
-                                @foreach ($flockOptions->where('farm_id', $flock->farm_id) as $option)
+                                @foreach ($flockOptions as $option)
                                     <option
                                         value="{{ $option->id }}"
                                         data-farm-id="{{ $option->farm_id }}"

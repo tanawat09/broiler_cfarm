@@ -40,6 +40,7 @@ class StoreFlockRequest extends FormRequest
             'placements.*.batch_no' => ['nullable', 'string', 'max:255'],
             'placements.*.sex' => ['nullable', 'string', 'max:255'],
             'placements.*.breed' => ['nullable', 'string', 'max:255'],
+            'redirect_to' => ['nullable', 'string'],
         ];
     }
 

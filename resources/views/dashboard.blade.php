@@ -114,18 +114,21 @@
             @else
                 <!-- 1. KPI Summary Cards -->
                 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <!-- KPI 1: Remaining Birds -->
+                    <!-- KPI 1: Liveability / Survival Rate -->
                     <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-                        <div class="absolute top-0 right-0 -mt-4 -mr-4 h-16 w-16 rounded-full bg-blue-50 transition-all group-hover:scale-150"></div>
+                        <div class="absolute top-0 right-0 -mt-4 -mr-4 h-16 w-16 rounded-full bg-emerald-50 transition-all group-hover:scale-150"></div>
                         <div class="relative flex items-center justify-between">
                             <div>
-                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">จำนวนไก่คงเหลือในฟาร์ม</p>
-                                <h3 class="mt-2 text-2xl font-bold text-slate-900">{{ number_format($kpis['remainingBirds']) }} <span class="text-sm font-medium text-slate-500">ตัว</span></h3>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">อัตราการเลี้ยงรอดสะสม (Liveability)</p>
+                                <h3 class="mt-2 text-2xl font-bold text-emerald-600">
+                                    {{ number_format($kpis['survivalRate'], 2) }}%
+                                    <span class="text-xs font-medium text-slate-500">({{ number_format($kpis['remainingBirds']) }} ตัว)</span>
+                                </h3>
                                 <p class="mt-1 text-xs text-slate-500">จากไก่เข้าเริ่มต้น {{ number_format($flock->initial_birds) }} ตัว</p>
                             </div>
-                            <div class="rounded-xl bg-blue-50 p-3 text-blue-600">
+                            <div class="rounded-xl bg-emerald-50 p-3 text-emerald-600">
                                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
                         </div>
@@ -215,7 +218,7 @@
                             <!-- Chart 3: Mortality splitting (Morning/Evening) -->
                             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <div class="mb-4 flex items-center justify-between">
-                                    <h3 class="text-sm font-bold uppercase tracking-wider text-slate-700">อัตราการตายแบ่งช่วงเวลา (ตัว)</h3>
+                                    <h3 class="text-sm font-bold uppercase tracking-wider text-slate-700">จำนวนไก่ตายและไก่คัดรายวัน (ตัว)</h3>
                                 </div>
                                 <div class="h-64 w-full">
                                     <canvas id="mortalityChart"></canvas>
@@ -254,26 +257,40 @@
 
                         <!-- Standard Comparison Table -->
                         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-3 mb-4">เปรียบเทียบกับมาตรฐาน</h3>
+                            <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+                                <h3 class="text-sm font-bold uppercase tracking-wider text-slate-700">เปรียบเทียบกับมาตรฐาน ( Ross 308 )</h3>
+                                <span class="text-xs font-semibold text-slate-500">คำนวณตามอายุจับจริงเฉลี่ย</span>
+                            </div>
                             <div class="overflow-x-auto">
-                                <table class="w-full text-left text-xs border-collapse">
+                                <table class="w-full text-left text-xs border-collapse min-w-[650px]">
                                     <thead>
-                                        <tr class="border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
-                                            <th class="py-2 pr-2 text-left">รายการ</th>
-                                            <th class="py-2 px-2 text-right">จริง</th>
-                                            <th class="py-2 px-2 text-right">STD</th>
-                                            <th class="py-2 pl-2 text-right">%STD</th>
+                                        <tr class="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                                            <th class="py-2 pr-2 text-left">ตัวชี้วัด</th>
+                                            <th class="py-2 px-2 text-right">จริง (Actual)</th>
+                                            <th class="py-2 px-2 text-right">STD {{ $comparisonTable['age']['std_prev'] }} วัน</th>
+                                            <th class="py-2 px-2 text-right">STD {{ $comparisonTable['age']['std_next'] }} วัน</th>
+                                            <th class="py-2 px-2 text-right">Delta ที่ใช้</th>
+                                            <th class="py-2 px-2 text-right">Fraction</th>
+                                            <th class="py-2 px-2 text-right bg-emerald-50/50 text-emerald-950 font-bold border-x border-emerald-100/50">STD (คุม)</th>
+                                            <th class="py-2 pl-2 text-right bg-indigo-50/50 text-indigo-950 font-bold">%STD</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100 text-slate-700">
-                                        @foreach($comparisonTable as $key => $row)
+                                        @foreach(['age', 'liveability', 'feed', 'weight', 'fcr', 'pi'] as $key)
+                                            @php 
+                                                $row = $comparisonTable[$key];
+                                            @endphp
                                             <tr class="hover:bg-slate-50/50 transition-colors">
-                                                <td class="py-2.5 pr-2 font-medium text-slate-800">{{ $row['label'] }}</td>
-                                                <td class="py-2.5 px-2 text-right font-bold text-slate-900">{{ $row['actual'] }}</td>
-                                                <td class="py-2.5 px-2 text-right font-semibold text-slate-500">{{ $row['std'] }}</td>
-                                                <td class="py-2.5 pl-2 text-right">
+                                                <td class="py-2.5 pr-2 font-semibold text-slate-800">{{ $row['label'] }}</td>
+                                                <td class="py-2.5 px-2 text-right font-bold text-slate-900 bg-slate-50/30">{{ $row['actual'] }}</td>
+                                                <td class="py-2.5 px-2 text-right text-slate-500">{{ $row['std_prev'] }}</td>
+                                                <td class="py-2.5 px-2 text-right text-slate-500">{{ $row['std_next'] }}</td>
+                                                <td class="py-2.5 px-2 text-right text-slate-500 font-medium">{{ $row['delta'] }}</td>
+                                                <td class="py-2.5 px-2 text-right text-slate-500 font-medium">{{ $row['fraction'] }}</td>
+                                                <td class="py-2.5 px-2 text-right font-bold text-emerald-700 bg-emerald-50/20 border-x border-emerald-100/30">{{ $row['std_interpolated'] }}</td>
+                                                <td class="py-2.5 pl-2 text-right bg-indigo-50/10">
                                                     @if($row['pct'] === '-')
-                                                        <span class="text-slate-400 font-medium">-</span>
+                                                        <span class="text-slate-400 font-semibold">-</span>
                                                     @else
                                                         @php 
                                                             $val = (float) str_replace('%', '', $row['pct']);
@@ -372,8 +389,8 @@
                         const tempMax = chartData.map(d => d.temp_max);
                         const humidity = chartData.map(d => d.humidity);
 
-                        const deadMorning = chartData.map(d => d.dead_morning);
-                        const deadEvening = chartData.map(d => d.dead_evening);
+                        const deadTotal = chartData.map(d => d.dead_morning + d.dead_evening);
+                        const cullTotal = chartData.map(d => d.cull_morning + d.cull_evening);
 
                         // 1. Feed & Water Dual Axis Line Chart
                         const ctxFeed = document.getElementById('feedWaterChart').getContext('2d');
@@ -494,14 +511,14 @@
                                 labels: labels,
                                 datasets: [
                                     {
-                                        label: 'เช้า',
-                                        data: deadMorning,
-                                        backgroundColor: '#fda4af',
+                                        label: 'ไก่ตาย',
+                                        data: deadTotal,
+                                        backgroundColor: '#ef4444',
                                     },
                                     {
-                                        label: 'เย็น',
-                                        data: deadEvening,
-                                        backgroundColor: '#f43f5e',
+                                        label: 'ไก่คัด',
+                                        data: cullTotal,
+                                        backgroundColor: '#f59e0b',
                                     }
                                 ]
                             },

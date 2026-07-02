@@ -35,7 +35,7 @@ class FeedIntakeMasterController extends Controller
 
         return redirect()
             ->route('feed-intake-masters.index')
-            ->with('status', 'บันทึกเกณฑ์การกินอาหารเรียบร้อยแล้ว');
+            ->with('status', 'บันทึกมาตรฐาน (Target Guide) เรียบร้อยแล้ว');
     }
 
     public function destroy(Request $request, FeedIntakeMaster $feedIntakeMaster): RedirectResponse
@@ -45,6 +45,6 @@ class FeedIntakeMasterController extends Controller
 
         return redirect()
             ->route('feed-intake-masters.index')
-            ->with('status', 'ลบเกณฑ์การกินอาหารเรียบร้อยแล้ว');
+            ->with('status', 'ลบมาตรฐาน (Target Guide) เรียบร้อยแล้ว');
     }
 }

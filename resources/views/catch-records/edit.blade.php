@@ -74,15 +74,20 @@
                         <div>
                             <x-input-label for="vehicle_type" value="ชนิดรถ" class="font-semibold text-slate-700 text-xs" />
                             <select id="vehicle_type" name="vehicle_type" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                                <option value="รถ 6 ล้อ" @selected(old('vehicle_type', $catchRecord->vehicle_type) == 'รถ 6 ล้อ')>รถ 6 ล้อ</option>
                                 <option value="รถ 10 ล้อ" @selected(old('vehicle_type', $catchRecord->vehicle_type) == 'รถ 10 ล้อ')>รถ 10 ล้อ</option>
+                                <option value="รถ 6 ล้อ" @selected(old('vehicle_type', $catchRecord->vehicle_type) == 'รถ 6 ล้อ')>รถ 6 ล้อ</option>
                                 <option value="รถกระบะ" @selected(old('vehicle_type', $catchRecord->vehicle_type) == 'รถกระบะ')>รถกระบะ</option>
                                 <option value="อื่นๆ" @selected(old('vehicle_type', $catchRecord->vehicle_type) == 'อื่นๆ')>อื่นๆ</option>
                             </select>
                         </div>
                         <div>
                             <x-input-label for="catching_team" value="ทีมจับไก่" class="font-semibold text-slate-700 text-xs" />
-                            <x-text-input id="catching_team" name="catching_team" type="text" class="mt-1 block w-full" :value="old('catching_team', $catchRecord->catching_team)" placeholder="เช่น ทีมผู้ใหญ่แดง" />
+                            <select id="catching_team" name="catching_team" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <option value="">เลือกทีมจับ</option>
+                                @foreach ($catchingTeams as $team)
+                                    <option value="{{ $team->name }}" @selected(old('catching_team', $catchRecord->catching_team) == $team->name)>{{ $team->name }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
 
@@ -108,4 +113,21 @@
             </form>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const vehicleSelect = document.getElementById('vehicle_type');
+            const feeInput = document.getElementById('catching_fee');
+
+            if (vehicleSelect && feeInput) {
+                vehicleSelect.addEventListener('change', () => {
+                    if (vehicleSelect.value === 'รถ 10 ล้อ') {
+                        feeInput.value = '1600';
+                    } else if (vehicleSelect.value === 'รถ 6 ล้อ') {
+                        feeInput.value = '1400';
+                    }
+                });
+            }
+        });
+    </script>
 </x-app-layout>

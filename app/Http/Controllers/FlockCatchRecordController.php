@@ -92,11 +92,14 @@ class FlockCatchRecordController extends Controller
             ->groupBy('house_id')
             ->pluck('next_seq', 'house_id');
 
+        $catchingTeams = \App\Models\CatchingTeam::query()->where('is_active', true)->orderBy('name')->get();
+
         return view('catch-records.create', compact(
             'flock',
             'catchDate',
             'availableStarts',
-            'nextSequences'
+            'nextSequences',
+            'catchingTeams'
         ));
     }
 
@@ -107,9 +110,9 @@ class FlockCatchRecordController extends Controller
         abort_if($flock->status === 'closed', 403, 'รุ่นการเลี้ยงนี้ถูกปิดไปแล้ว ไม่สามารถบันทึกหรือแก้ไขข้อมูลได้');
 
         $validated = $request->validate([
-            'house_id' => 'required|exists:houses,id',
-            'catch_date' => 'required|date',
             'items' => 'required|array|min:1',
+            'items.*.house_id' => 'required|exists:houses,id',
+            'items.*.catch_date' => 'required|date',
             'items.*.sequence' => 'required|integer|min:1',
             'items.*.license_plate' => 'required|string|max:50',
             'items.*.birds_count' => 'required|integer|min:0',
@@ -121,16 +124,20 @@ class FlockCatchRecordController extends Controller
         ]);
 
         $allowedHouseIds = $flock->flockHouseStarts()->pluck('house_id')->all();
-        if (!in_array((int)$validated['house_id'], $allowedHouseIds, true)) {
-            throw ValidationException::withMessages(['house_id' => 'เล้านี้ไม่อยู่ในรุ่นการเลี้ยงที่เลือก']);
+        foreach ($validated['items'] as $index => $item) {
+            if (!in_array((int)$item['house_id'], $allowedHouseIds, true)) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.house_id" => 'เล้านี้ไม่อยู่ในรุ่นการเลี้ยงที่เลือก'
+                ]);
+            }
         }
 
         foreach ($validated['items'] as $item) {
             FlockCatchRecord::create([
                 'farm_id' => $flock->farm_id,
                 'flock_id' => $flock->id,
-                'house_id' => $validated['house_id'],
-                'catch_date' => CarbonImmutable::parse($validated['catch_date'])->toDateString(),
+                'house_id' => $item['house_id'],
+                'catch_date' => CarbonImmutable::parse($item['catch_date'])->toDateString(),
                 'sequence' => $item['sequence'],
                 'license_plate' => $item['license_plate'],
                 'birds_count' => $item['birds_count'],
@@ -157,10 +164,13 @@ class FlockCatchRecordController extends Controller
         $flock->load(['farm', 'flockHouseStarts.house']);
         $availableStarts = $flock->flockHouseStarts->sortBy('house.house_no')->values();
 
+        $catchingTeams = \App\Models\CatchingTeam::query()->where('is_active', true)->orderBy('name')->get();
+
         return view('catch-records.edit', compact(
             'flock',
             'catchRecord',
-            'availableStarts'
+            'availableStarts',
+            'catchingTeams'
         ));
     }
 

@@ -108,6 +108,12 @@
             'active' => request()->routeIs('chick-sources.*'),
             'icon' => 'M4 20V6a2 2 0 0 1 2-2h4l2-2 2 2h4a2 2 0 0 1 2 2v14H4Zm4-3h8v-2H8v2Zm0-4h8v-2H8v2Zm0-4h5V7H8v2Z',
         ],
+        [
+            'label' => 'ทีมจับไก่',
+            'href' => route('catching-teams.index'),
+            'active' => request()->routeIs('catching-teams.*'),
+            'icon' => 'M12 2a5 5 0 0 0-5 5v3H5v11h14V10h-2V7a5 5 0 0 0-5-5Zm3 8H9V7a3 3 0 0 1 6 0v3Z',
+        ],
     ];
 
     if (auth()->user()->isSuperAdmin()) {

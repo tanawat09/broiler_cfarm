@@ -19,6 +19,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\WaterMeterRecordController;
 use App\Http\Controllers\WeightRecordController;
 use App\Http\Controllers\FlockCatchRecordController;
+use App\Http\Controllers\CatchingTeamController;
 use App\Support\FarmAccess;
 use Illuminate\Support\Facades\Route;
 
@@ -112,6 +113,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('farms', FarmController::class);
     Route::resource('users', UserController::class)->except(['show']);
     Route::resource('chick-sources', ChickSourceController::class)->except(['show']);
+    Route::resource('catching-teams', CatchingTeamController::class)->except(['show']);
     Route::resource('chick-price-masters', ChickPriceMasterController::class)->only(['index', 'store', 'destroy']);
     Route::resource('sale-price-masters', SalePriceMasterController::class)->only(['index', 'store', 'destroy']);
     Route::resource('feed-intake-masters', FeedIntakeMasterController::class)->only(['index', 'store', 'destroy']);

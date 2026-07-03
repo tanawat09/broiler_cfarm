@@ -2,14 +2,14 @@
     <x-slot name="header">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h1 class="text-xl font-semibold text-slate-900">คิดค่าจับไก่</h1>
+                <h1 class="text-xl font-semibold text-slate-900">บันทึกคิวจับไก่</h1>
                 <p class="mt-1 text-sm text-slate-600">{{ $flock->farm->farm_name }} / รุ่น {{ $flock->flock_code }}</p>
             </div>
             <a href="{{ route('flocks.catch-records.create', $flock) }}" class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 transition-all duration-200 transform hover:-translate-y-0.5">
                 <svg class="h-4 w-4 text-white/80 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                บันทึกค่าจับไก่
+                บันทึกคิวจับไก่
             </a>
         </div>
     </x-slot>
@@ -109,6 +109,103 @@
                 </div>
             </div>
 
+            <div class="mb-5 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-100 bg-slate-50/60 px-5 py-4">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900">รายละเอียดทีมจับไก่</h2>
+                            <p class="mt-0.5 text-xs text-slate-500">ทีมที่ถูกใช้ในรุ่นนี้ พร้อมค่าน้ำมันและค่ารถยกสำหรับสรุปการจ่ายเงิน</p>
+                        </div>
+                        <div class="flex flex-col items-start gap-3 sm:items-end">
+                            <div class="text-right text-xs text-slate-600">
+                                <div>รวมค่าน้ำมัน: <span class="font-bold text-slate-900">฿{{ number_format($teamPaymentSummary['total_fuel_cost'], 2) }}</span></div>
+                                <div>รวมค่ารถยก: <span class="font-bold text-slate-900">฿{{ number_format($teamPaymentSummary['total_forklift_cost'], 2) }}</span></div>
+                                <div>หัก ณ ที่จ่าย 3%: <span class="font-bold text-red-700">฿{{ number_format($teamPaymentSummary['withholding_amount'], 2) }}</span></div>
+                                <div>สุทธิจ่าย: <span class="font-bold text-emerald-700">฿{{ number_format($teamPaymentSummary['net_payment'], 2) }}</span></div>
+                            </div>
+                            <a href="{{ route('flocks.catch-records.payment-report-pdf', $flock) }}" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-red-500/25 hover:from-red-700 hover:to-rose-700 hover:shadow-xl hover:shadow-red-500/30 transition-all duration-200">
+                                <svg class="h-5 w-5 text-white/90" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5A3.375 3.375 0 0 0 10.125 2.25H8.25m2.25 0H5.625C5.004 2.25 4.5 2.754 4.5 3.375v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                                </svg>
+                                เปิด PDF สรุปจ่ายเงิน
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                @if ($teamPaymentRows->isNotEmpty())
+                    <form method="POST" action="{{ route('flocks.catch-records.team-costs.update', $flock) }}">
+                        @csrf
+                        <div class="overflow-x-auto">
+                            <table class="min-w-[1200px] divide-y divide-slate-200 text-sm">
+                                <thead class="bg-slate-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-medium text-slate-600">ทีมจับไก่</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">เที่ยวรถ</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">จำนวนตัว</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">จำนวนกล่อง</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">ค่าจับ</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">ค่าน้ำมัน</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">ค่ารถยก</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">รวมจ่าย</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">หัก 3%</th>
+                                        <th class="px-4 py-3 text-right font-medium text-slate-600">สุทธิจ่าย</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 bg-white">
+                                    @foreach ($teamPaymentRows as $index => $row)
+                                        <tr>
+                                            <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                                                {{ $row['catching_team'] }}
+                                                <input type="hidden" name="costs[{{ $index }}][catching_team]" value="{{ $row['catching_team'] }}">
+                                            </td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right font-mono text-slate-700">{{ number_format($row['total_trips']) }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right font-mono text-slate-700">{{ number_format($row['total_birds']) }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right font-mono text-slate-700">{{ number_format($row['total_boxes']) }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-emerald-700">฿{{ number_format($row['total_fee'], 2) }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3">
+                                                <input
+                                                    type="number"
+                                                    name="costs[{{ $index }}][fuel_cost]"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value="{{ old('costs.'.$index.'.fuel_cost', $row['fuel_cost']) }}"
+                                                    class="w-32 rounded-md border-gray-300 text-right text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                                    @disabled($flock->status === 'closed')
+                                                >
+                                            </td>
+                                            <td class="whitespace-nowrap px-4 py-3">
+                                                <input
+                                                    type="number"
+                                                    name="costs[{{ $index }}][forklift_cost]"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value="{{ old('costs.'.$index.'.forklift_cost', $row['forklift_cost']) }}"
+                                                    class="w-32 rounded-md border-gray-300 text-right text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                                    @disabled($flock->status === 'closed')
+                                                >
+                                            </td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-900">฿{{ number_format($row['payment_total'], 2) }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-red-700">฿{{ number_format($row['withholding_amount'], 2) }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right font-bold text-emerald-700">฿{{ number_format($row['net_payment'], 2) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @if ($flock->status !== 'closed')
+                            <div class="flex justify-end border-t border-slate-100 bg-slate-50/40 px-5 py-4">
+                                <button type="submit" class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors">
+                                    บันทึกรายละเอียดทีมจับไก่
+                                </button>
+                            </div>
+                        @endif
+                    </form>
+                @else
+                    <div class="px-5 py-8 text-center text-sm text-slate-500">ยังไม่มีข้อมูลทีมจับไก่ในรุ่นนี้</div>
+                @endif
+            </div>
+
             <div class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
                 <div class="overflow-x-auto">
                     <table class="min-w-[1200px] divide-y divide-slate-200 text-sm">
@@ -157,7 +254,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="11" class="px-4 py-8 text-center text-slate-500">ยังไม่มีประวัติการคีย์ข้อมูลคิดค่าจับไก่</td>
+                                    <td colspan="11" class="px-4 py-8 text-center text-slate-500">ยังไม่มีประวัติการคีย์ข้อมูลบันทึกคิวจับไก่</td>
                                 </tr>
                             @endforelse
                         </tbody>

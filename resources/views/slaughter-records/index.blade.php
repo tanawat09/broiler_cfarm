@@ -5,12 +5,26 @@
                 <h1 class="text-xl font-semibold text-slate-900">ไก่เข้าเชือด นน.หน้าโรงงาน</h1>
                 <p class="mt-1 text-sm text-slate-600">{{ $flock->farm->farm_name }} / รุ่น {{ $flock->flock_code }}</p>
             </div>
-            <a href="{{ route('flocks.slaughter-records.upload', $flock) }}" class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 transition-all duration-200 transform hover:-translate-y-0.5">
-                <svg class="h-4 w-4 text-white/80 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                นำเข้าไฟล์ Excel
-            </a>
+            <div class="flex items-center gap-3">
+                @if ($flock->status !== 'closed' && $slaughterRecords->total() > 0)
+                    <form method="POST" action="{{ route('flocks.slaughter-records.destroy-all', $flock) }}" onsubmit="return confirm('⚠️ ยืนยันลบข้อมูลไก่เข้าเชือดทั้งหมดของรุ่นนี้หรือไม่?\n\nจำนวน {{ $slaughterRecords->total() }} รายการจะถูกลบถาวร')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="group inline-flex items-center gap-2 rounded-xl border-2 border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-600 shadow-sm hover:bg-red-50 hover:border-red-400 hover:text-red-700 transition-all duration-200">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                            </svg>
+                            ลบข้อมูลรุ่นนี้ทั้งหมด
+                        </button>
+                    </form>
+                @endif
+                <a href="{{ route('flocks.slaughter-records.upload', $flock) }}" class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 transition-all duration-200 transform hover:-translate-y-0.5">
+                    <svg class="h-4 w-4 text-white/80 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    นำเข้าไฟล์ Excel
+                </a>
+            </div>
         </div>
     </x-slot>
 
@@ -124,9 +138,10 @@
             <!-- Main Table -->
             <div class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
                 <div class="overflow-x-auto">
-                    <table class="min-w-[1500px] divide-y divide-slate-200 text-sm">
+                    <table class="min-w-[1580px] divide-y divide-slate-200 text-sm">
                         <thead class="bg-slate-50">
                             <tr>
+                                <th class="px-4 py-3 text-center font-medium text-slate-600">คันที่/ลำดับ</th>
                                 <th class="px-4 py-3 text-left font-medium text-slate-600">วันที่เข้าเชือด</th>
                                 <th class="px-4 py-3 text-left font-medium text-slate-600">เล้า</th>
                                 <th class="px-4 py-3 text-left font-medium text-slate-600">ชื่อเล้าใน Excel</th>
@@ -145,6 +160,7 @@
                         <tbody class="divide-y divide-slate-200 bg-white">
                             @forelse ($slaughterRecords as $record)
                                 <tr class="hover:bg-slate-50/40">
+                                    <td class="whitespace-nowrap px-4 py-3 text-center font-mono text-slate-700">คันที่ {{ $record->sequence ?: '-' }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ thai_date($record->slaughter_date) }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">เล้า {{ $record->house->house_no }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 text-slate-500 font-mono">{{ $record->raw_house_name ?: '-' }}</td>
@@ -173,7 +189,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="13" class="px-4 py-8 text-center text-slate-500">ยังไม่มีประวัติการนำเข้าข้อมูลไก่เข้าเชือด นน.หน้าโรงงาน</td>
+                                    <td colspan="14" class="px-4 py-8 text-center text-slate-500">ยังไม่มีประวัติการนำเข้าข้อมูลไก่เข้าเชือด นน.หน้าโรงงาน</td>
                                 </tr>
                             @endforelse
                         </tbody>

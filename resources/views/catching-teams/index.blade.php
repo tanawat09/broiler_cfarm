@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-xl font-semibold text-gray-900">ทีมจับไก่</h1>
-                <p class="mt-1 text-sm text-gray-600">จัดการรายชื่อทีมจับไก่สำหรับใช้ในระบบบันทึกคิดค่าจับไก่</p>
+                <p class="mt-1 text-sm text-gray-600">จัดการรายชื่อทีมจับไก่สำหรับใช้ในระบบบันทึกคิวจับไก่</p>
             </div>
             <a href="{{ route('catching-teams.create') }}" class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 transition-all duration-200 transform hover:-translate-y-0.5">
                 <svg class="h-4 w-4 text-white/80 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">

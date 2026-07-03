@@ -43,7 +43,7 @@
             'icon' => 'M4 6h16v4H4V6Zm2 6h12v8H6v-8Zm3-9h6l2 2H7l2-2Zm1 12h4v2h-4v-2Z',
         ],
         [
-            'label' => 'คิดค่าจับไก่',
+            'label' => 'บันทึกคิวจับไก่',
             'href' => route('catch-records.shortcut'),
             'active' => request()->is('catch-records') || request()->routeIs('flocks.catch-records.*'),
             'icon' => 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z',

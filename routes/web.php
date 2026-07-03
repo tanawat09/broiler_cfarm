@@ -125,14 +125,21 @@ Route::middleware('auth')->group(function () {
         ->names('flocks.sale-records')
         ->except(['show']);
 
+    Route::post('/flocks/{flock}/catch-records/team-costs', [FlockCatchRecordController::class, 'updateTeamCosts'])
+        ->name('flocks.catch-records.team-costs.update');
+    Route::get('/flocks/{flock}/catch-records/payment-report.pdf', [FlockCatchRecordController::class, 'paymentReportPdf'])
+        ->name('flocks.catch-records.payment-report-pdf');
+
     Route::resource('/flocks/{flock}/catch-records', FlockCatchRecordController::class)
         ->names('flocks.catch-records')
         ->except(['show']);
 
     Route::get('/flocks/{flock}/slaughter-records/upload', [FlockSlaughterRecordController::class, 'showUploadPage'])->name('flocks.slaughter-records.upload');
     Route::post('/flocks/{flock}/slaughter-records/upload', [FlockSlaughterRecordController::class, 'handleUpload'])->name('flocks.slaughter-records.handle-upload');
+    Route::get('/flocks/{flock}/slaughter-records/config', [FlockSlaughterRecordController::class, 'configFallback'])->name('flocks.slaughter-records.config-fallback');
     Route::post('/flocks/{flock}/slaughter-records/config', [FlockSlaughterRecordController::class, 'handleConfig'])->name('flocks.slaughter-records.handle-config');
     Route::post('/flocks/{flock}/slaughter-records/import', [FlockSlaughterRecordController::class, 'handleImport'])->name('flocks.slaughter-records.handle-import');
+    Route::delete('/flocks/{flock}/slaughter-records/destroy-all', [FlockSlaughterRecordController::class, 'destroyByFlock'])->name('flocks.slaughter-records.destroy-all');
     Route::resource('/flocks/{flock}/slaughter-records', FlockSlaughterRecordController::class)
         ->names('flocks.slaughter-records')
         ->only(['index', 'destroy']);

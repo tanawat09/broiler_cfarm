@@ -27,12 +27,11 @@
             <form method="POST" action="{{ route('flocks.slaughter-records.handle-import', $flock) }}">
                 @csrf
                 <input type="hidden" name="temp_path" value="{{ $tempPath }}">
-                <input type="hidden" name="slaughter_date" value="{{ $slaughterDate }}">
 
                 <div class="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex items-center justify-between">
                     <div>
-                        <span class="text-xs text-slate-500 font-semibold block">วันที่เข้าเชือดของไฟล์นี้</span>
-                        <span class="text-lg font-bold text-slate-800">{{ thai_date($slaughterDate) }}</span>
+                        <span class="text-xs text-slate-500 font-semibold block">วันที่เข้าเชือด</span>
+                        <span class="text-sm font-bold text-slate-800">ใช้วันที่จับจากบันทึกจับไก่ตามคันที่/เล้า</span>
                     </div>
                     <div class="text-right">
                         <span class="text-xs text-slate-500 font-semibold block">จำนวนรายการที่พบ</span>
@@ -42,9 +41,11 @@
 
                 <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs border-collapse min-w-[1500px]">
+                        <table class="w-full text-left text-xs border-collapse min-w-[1660px]">
                             <thead class="bg-slate-50">
                                 <tr>
+                                    <th class="w-24 px-4 py-3 font-semibold text-slate-600 text-center">คันที่/ลำดับ</th>
+                                    <th class="w-32 px-4 py-3 font-semibold text-slate-600 text-center">วันที่จับไก่</th>
                                     <th class="w-36 px-4 py-3 font-semibold text-slate-600">ชื่อเล้าใน Excel</th>
                                     <th class="w-44 px-4 py-3 font-semibold text-slate-600">จับคู่เล้าในระบบ</th>
                                     <th class="w-28 px-4 py-3 font-semibold text-slate-600 text-right">ไก่เข้าเชือด (ตัว)</th>
@@ -61,6 +62,18 @@
                             <tbody class="divide-y divide-slate-100 bg-white">
                                 @foreach ($parsedRows as $index => $row)
                                     <tr class="hover:bg-slate-50/40">
+                                        <td class="px-4 py-2 text-center">
+                                            <input type="number" min="1" name="records[{{ $index }}][sequence]" value="{{ $row['sequence'] }}" class="w-20 rounded-md border-gray-300 bg-slate-50 text-xs text-center py-1 font-mono font-semibold" readonly required>
+                                        </td>
+
+                                        <td class="px-4 py-2 text-center whitespace-nowrap">
+                                            @if (!empty($row['catch_date']))
+                                                <span class="font-mono font-semibold text-emerald-700">{{ thai_date($row['catch_date']) }}</span>
+                                            @else
+                                                <span class="font-semibold text-red-600">ไม่พบวันที่</span>
+                                            @endif
+                                        </td>
+
                                         <!-- Raw House Name -->
                                         <td class="px-4 py-2 text-slate-900 font-semibold font-mono">
                                             {{ $row['raw_house_name'] }}

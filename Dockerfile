@@ -21,12 +21,14 @@ FROM php:8.3-cli-alpine
 
 WORKDIR /var/www/html
 
-RUN apk add --no-cache bash mariadb-client libzip-dev zip unzip \
-    && docker-php-ext-install pdo_mysql zip
+RUN apk add --no-cache bash mariadb-client libzip-dev zip unzip freetype-dev libjpeg-turbo-dev libpng-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_mysql zip gd
 
 COPY --from=vendor /app/vendor ./vendor
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
+COPY docker/php-overrides.ini /usr/local/etc/php/conf.d/broiler-overrides.ini
 COPY docker/entrypoint.sh /usr/local/bin/broiler-entrypoint
 
 RUN rm -f bootstrap/cache/*.php \

@@ -5,12 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\Farm;
 use App\Models\Flock;
 use App\Models\FlockCatchRecord;
+use App\Models\FlockCatchTeamCost;
 use App\Support\FarmAccess;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Mpdf\Mpdf;
 
 class FlockCatchRecordController extends Controller
 {
@@ -45,8 +48,8 @@ class FlockCatchRecordController extends Controller
             ->when($startDate, fn ($query) => $query->whereDate('catch_date', '>=', $startDate))
             ->when($endDate, fn ($query) => $query->whereDate('catch_date', '<=', $endDate))
             ->orderByDesc('catch_date')
-            ->orderByDesc('sequence')
-            ->orderByDesc('id')
+            ->orderBy('sequence')
+            ->orderBy('id')
             ->paginate(15)
             ->withQueryString();
 
@@ -63,6 +66,8 @@ class FlockCatchRecordController extends Controller
             'total_boxes' => (int) (clone $summaryQuery)->sum('boxes_count'),
         ];
 
+        [$teamPaymentRows, $teamPaymentSummary] = $this->teamPaymentData($flock);
+
         return view('catch-records.index', compact(
             'flock',
             'farms',
@@ -70,6 +75,8 @@ class FlockCatchRecordController extends Controller
             'availableStarts',
             'catchRecords',
             'summary',
+            'teamPaymentRows',
+            'teamPaymentSummary',
             'startDate',
             'endDate',
             'houseId'
@@ -85,12 +92,9 @@ class FlockCatchRecordController extends Controller
         $catchDate = $request->query('catch_date', now()->toDateString());
         $availableStarts = $flock->flockHouseStarts->sortBy('house.house_no')->values();
 
-        // Calculate next sequence for each house to help pre-fill
-        $nextSequences = FlockCatchRecord::query()
+        $nextSequence = ((int) FlockCatchRecord::query()
             ->where('flock_id', $flock->id)
-            ->selectRaw('house_id, COALESCE(MAX(sequence), 0) + 1 as next_seq')
-            ->groupBy('house_id')
-            ->pluck('next_seq', 'house_id');
+            ->max('sequence')) + 1;
 
         $catchingTeams = \App\Models\CatchingTeam::query()->where('is_active', true)->orderBy('name')->get();
 
@@ -98,7 +102,7 @@ class FlockCatchRecordController extends Controller
             'flock',
             'catchDate',
             'availableStarts',
-            'nextSequences',
+            'nextSequence',
             'catchingTeams'
         ));
     }
@@ -231,6 +235,102 @@ class FlockCatchRecordController extends Controller
             ->with('status', 'ลบรายการจับไก่เรียบร้อยแล้ว');
     }
 
+    public function updateTeamCosts(Request $request, Flock $flock): RedirectResponse
+    {
+        $user = $request->user();
+        FarmAccess::ensureFlock($user, $flock);
+        abort_if($flock->status === 'closed', 403, 'รุ่นการเลี้ยงนี้ถูกปิดไปแล้ว ไม่สามารถแก้ไขข้อมูลได้');
+
+        $validated = $request->validate([
+            'costs' => 'nullable|array',
+            'costs.*.catching_team' => 'required|string|max:100',
+            'costs.*.fuel_cost' => 'nullable|numeric|min:0',
+            'costs.*.forklift_cost' => 'nullable|numeric|min:0',
+        ]);
+
+        $usedTeams = FlockCatchRecord::query()
+            ->where('flock_id', $flock->id)
+            ->whereNotNull('catching_team')
+            ->where('catching_team', '!=', '')
+            ->pluck('catching_team')
+            ->unique()
+            ->values()
+            ->all();
+
+        foreach ($validated['costs'] ?? [] as $item) {
+            if (! in_array($item['catching_team'], $usedTeams, true)) {
+                continue;
+            }
+
+            FlockCatchTeamCost::query()->updateOrCreate(
+                [
+                    'flock_id' => $flock->id,
+                    'catching_team' => $item['catching_team'],
+                ],
+                [
+                    'farm_id' => $flock->farm_id,
+                    'fuel_cost' => $item['fuel_cost'] ?? 0,
+                    'forklift_cost' => $item['forklift_cost'] ?? 0,
+                    'created_by' => $user?->id,
+                    'updated_by' => $user?->id,
+                ]
+            );
+        }
+
+        return redirect()
+            ->route('flocks.catch-records.index', $flock)
+            ->with('status', 'บันทึกรายละเอียดทีมจับไก่เรียบร้อยแล้ว');
+    }
+
+    public function paymentReportPdf(Request $request, Flock $flock): Response
+    {
+        FarmAccess::ensureFlock($request->user(), $flock);
+        $flock->load('farm');
+
+        [$teamPaymentRows, $teamPaymentSummary] = $this->teamPaymentData($flock);
+        $catchRecords = FlockCatchRecord::query()
+            ->where('flock_id', $flock->id)
+            ->with('house')
+            ->orderBy('sequence')
+            ->orderBy('id')
+            ->get();
+
+        $html = view('catch-records.payment-report-pdf', [
+            'flock' => $flock,
+            'teamPaymentRows' => $teamPaymentRows,
+            'teamPaymentSummary' => $teamPaymentSummary,
+            'catchRecords' => $catchRecords,
+            'withholdingRate' => 0.03,
+            'generatedAt' => now(),
+        ])->render();
+
+        if (! is_dir(storage_path('app/mpdf'))) {
+            mkdir(storage_path('app/mpdf'), 0775, true);
+        }
+
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'default_font' => 'garuda',
+            'tempDir' => storage_path('app/mpdf'),
+            'margin_left' => 8,
+            'margin_right' => 8,
+            'margin_top' => 10,
+            'margin_bottom' => 10,
+        ]);
+        $mpdf->autoScriptToLang = true;
+        $mpdf->autoLangToFont = true;
+        $mpdf->SetTitle('รายงานสรุปค่าจับไก่');
+        $mpdf->WriteHTML($html);
+
+        $fileName = 'catch-payment-report-flock-'.$flock->id.'.pdf';
+
+        return response($mpdf->Output($fileName, 'S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$fileName.'"',
+        ]);
+    }
+
     public function shortcut(Request $request): RedirectResponse
     {
         $flock = FarmAccess::activeFlockFor($request->user());
@@ -242,5 +342,55 @@ class FlockCatchRecordController extends Controller
         }
 
         return redirect()->route('flocks.catch-records.index', $flock);
+    }
+
+    private function teamPaymentData(Flock $flock): array
+    {
+        $teamSummaries = FlockCatchRecord::query()
+            ->where('flock_id', $flock->id)
+            ->whereNotNull('catching_team')
+            ->where('catching_team', '!=', '')
+            ->selectRaw('catching_team, COUNT(*) as total_trips, SUM(birds_count) as total_birds, SUM(boxes_count) as total_boxes, SUM(catching_fee) as total_fee')
+            ->groupBy('catching_team')
+            ->orderBy('catching_team')
+            ->get();
+
+        $teamCosts = FlockCatchTeamCost::query()
+            ->where('flock_id', $flock->id)
+            ->get()
+            ->keyBy('catching_team');
+
+        $teamPaymentRows = $teamSummaries->map(function ($team) use ($teamCosts) {
+            $cost = $teamCosts->get($team->catching_team);
+            $fuelCost = (float) ($cost?->fuel_cost ?? 0);
+            $forkliftCost = (float) ($cost?->forklift_cost ?? 0);
+            $catchingFee = (float) $team->total_fee;
+            $paymentTotal = $catchingFee + $fuelCost + $forkliftCost;
+            $withholdingAmount = round($paymentTotal * 0.03, 2);
+
+            return [
+                'catching_team' => $team->catching_team,
+                'total_trips' => (int) $team->total_trips,
+                'total_birds' => (int) $team->total_birds,
+                'total_boxes' => (int) $team->total_boxes,
+                'total_fee' => $catchingFee,
+                'fuel_cost' => $fuelCost,
+                'forklift_cost' => $forkliftCost,
+                'payment_total' => $paymentTotal,
+                'withholding_amount' => $withholdingAmount,
+                'net_payment' => $paymentTotal - $withholdingAmount,
+            ];
+        });
+
+        $teamPaymentSummary = [
+            'total_fee' => (float) $teamPaymentRows->sum('total_fee'),
+            'total_fuel_cost' => (float) $teamPaymentRows->sum('fuel_cost'),
+            'total_forklift_cost' => (float) $teamPaymentRows->sum('forklift_cost'),
+            'payment_total' => (float) $teamPaymentRows->sum('payment_total'),
+            'withholding_amount' => (float) $teamPaymentRows->sum('withholding_amount'),
+            'net_payment' => (float) $teamPaymentRows->sum('net_payment'),
+        ];
+
+        return [$teamPaymentRows, $teamPaymentSummary];
     }
 }

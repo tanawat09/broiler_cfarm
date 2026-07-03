@@ -28,7 +28,6 @@
                 <form method="POST" action="{{ route('flocks.slaughter-records.handle-config', $flock) }}" class="space-y-6">
                     @csrf
                     <input type="hidden" name="temp_path" value="{{ $path }}">
-                    <input type="hidden" name="slaughter_date" value="{{ $slaughterDate }}">
 
                     <!-- Sheet selection -->
                     <div class="grid gap-5 md:grid-cols-2">

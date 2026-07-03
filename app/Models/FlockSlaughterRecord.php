@@ -15,6 +15,7 @@ class FlockSlaughterRecord extends Model
         'flock_id',
         'house_id',
         'slaughter_date',
+        'sequence',
         'raw_house_name',
         'slaughter_birds',
         'actual_weight',
@@ -33,6 +34,7 @@ class FlockSlaughterRecord extends Model
     {
         return [
             'slaughter_date' => 'date',
+            'sequence' => 'integer',
             'slaughter_birds' => 'integer',
             'actual_weight' => 'decimal:2',
             'doa_birds' => 'integer',

@@ -36,11 +36,6 @@
                     </div>
 
                     <div>
-                        <x-input-label for="slaughter_date" value="วันที่เข้าเชือด" class="font-bold text-slate-750 text-xs" />
-                        <x-text-input id="slaughter_date" name="slaughter_date" type="date" class="mt-1.5 block w-full" :value="old('slaughter_date', now()->toDateString())" required />
-                    </div>
-
-                    <div>
                         <x-input-label for="file" value="เลือกไฟล์ Excel (.xlsx, .xls)" class="font-bold text-slate-750 text-xs" />
                         <div class="mt-1.5 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 border-dashed rounded-lg hover:border-emerald-400 transition-colors">
                             <div class="space-y-1 text-center">

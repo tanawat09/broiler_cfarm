@@ -12,7 +12,7 @@
     </x-slot>
 
     <div class="py-6">
-        <div class="mx-auto w-full max-w-[1200px] px-3 sm:px-4 lg:px-6">
+        <div class="mx-auto w-full max-w-[1300px] px-3 sm:px-4 lg:px-6">
             @if ($errors->any())
                 <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                     <span class="font-bold">กรุณาตรวจสอบข้อมูล:</span>
@@ -27,9 +27,9 @@
             <form method="POST" action="{{ route('flocks.catch-records.store', $flock) }}" id="catch-records-form">
                 @csrf
 
-                <!-- Header inputs: House and Date -->
+                <!-- Header inputs: House and Date in same row -->
                 <div class="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="grid gap-5 md:grid-cols-2">
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <x-input-label for="house_id" value="เลือกเล้า" class="font-semibold text-slate-700 text-xs" />
                             <select id="house_id" name="house_id" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500" required>
@@ -50,34 +50,27 @@
 
                 <!-- Dynamic Rows table for trucks/trips -->
                 <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div class="border-b border-slate-100 bg-slate-50/50 px-5 py-4 flex items-center justify-between">
-                        <div>
-                            <h2 class="text-sm font-bold text-slate-900">รายละเอียดเที่ยวรถจับไก่</h2>
-                            <p class="text-xs text-slate-500 mt-0.5">ระบุรายละเอียดการจับไก่ของรถแต่ละคัน (1 เล้าสามารถกดเพิ่มได้หลายคัน)</p>
-                        </div>
-                        <button type="button" id="add-row-btn" class="group inline-flex items-center gap-1.5 rounded-xl border border-slate-350 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
-                            <svg class="h-4.5 w-4.5 text-slate-500 group-hover:text-slate-700" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                            </svg>
-                            เพิ่มเที่ยวรถ
-                        </button>
+                    <div class="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
+                        <h2 class="text-sm font-bold text-slate-900">รายละเอียดเที่ยวรถจับไก่</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">ระบุรายละเอียดการจับไก่ของรถแต่ละคัน (1 เล้าสามารถคีย์เพิ่มได้หลายคัน)</p>
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs border-collapse min-w-[900px]" id="catch-rows-table">
+                        <table class="w-full text-left text-xs border-collapse min-w-[1000px]" id="catch-rows-table">
                             <thead class="bg-slate-50">
                                 <tr>
                                     <th class="w-20 px-4 py-3 font-semibold text-slate-600 text-center">ลำดับที่</th>
-                                    <th class="w-40 px-4 py-3 font-semibold text-slate-600">ทะเบียนรถ</th>
-                                    <th class="w-40 px-4 py-3 font-semibold text-slate-600">ชนิดรถ</th>
-                                    <th class="w-48 px-4 py-3 font-semibold text-slate-600">ทีมจับไก่</th>
-                                    <th class="w-36 px-4 py-3 font-semibold text-slate-600 text-right">ค่าจับ (บาท)</th>
+                                    <th class="w-36 px-4 py-3 font-semibold text-slate-600">ทะเบียนรถ</th>
+                                    <th class="w-28 px-4 py-3 font-semibold text-slate-600 text-right">จำนวนตัว</th>
+                                    <th class="w-28 px-4 py-3 font-semibold text-slate-600 text-right">จำนวนกล่อง</th>
+                                    <th class="w-36 px-4 py-3 font-semibold text-slate-600">ชนิดรถ</th>
+                                    <th class="w-40 px-4 py-3 font-semibold text-slate-600">ทีมจับไก่</th>
+                                    <th class="w-32 px-4 py-3 font-semibold text-slate-600 text-right">ค่าจับ (บาท)</th>
                                     <th class="px-4 py-3 font-semibold text-slate-600">หมายเหตุ / อื่นๆ</th>
                                     <th class="w-16 px-4 py-3 font-semibold text-slate-600 text-center">ลบ</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100" id="catch-records-tbody">
-                                <!-- JavaScript will inject default rows, or render old input values if submission failed -->
                                 @if (old('items'))
                                     @foreach (old('items') as $index => $item)
                                         <tr class="catch-row hover:bg-slate-50/40">
@@ -86,6 +79,12 @@
                                             </td>
                                             <td class="px-4 py-2.5">
                                                 <input type="text" name="items[{{ $index }}][license_plate]" value="{{ $item['license_plate'] }}" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500" placeholder="เช่น กข-1234" required>
+                                            </td>
+                                            <td class="px-4 py-2.5">
+                                                <input type="number" min="0" name="items[{{ $index }}][birds_count]" value="{{ $item['birds_count'] }}" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-right" required>
+                                            </td>
+                                            <td class="px-4 py-2.5">
+                                                <input type="number" min="0" name="items[{{ $index }}][boxes_count]" value="{{ $item['boxes_count'] }}" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-right" required>
                                             </td>
                                             <td class="px-4 py-2.5">
                                                 <select name="items[{{ $index }}][vehicle_type]" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -105,7 +104,7 @@
                                                 <input type="text" name="items[{{ $index }}][note]" value="{{ $item['note'] ?? '' }}" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500" placeholder="หมายเหตุ">
                                             </td>
                                             <td class="px-4 py-2.5 text-center">
-                                                <button type="button" class="text-red-600 hover:text-red-900 remove-row-btn">
+                                                <button type="button" class="text-red-650 hover:text-red-900 remove-row-btn">
                                                     <svg class="h-4.5 w-4.5 inline" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-12 12m0-12l12 12" />
                                                     </svg>
@@ -116,6 +115,16 @@
                                 @endif
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Add catch row button placed at the bottom of the input table -->
+                    <div class="px-5 py-4 border-t border-slate-100 bg-slate-50/30 flex justify-center">
+                        <button type="button" id="add-row-btn" class="group inline-flex items-center gap-1.5 rounded-xl border border-slate-350 bg-white px-4 py-2 text-xs font-bold text-slate-750 shadow-sm hover:bg-slate-50 transition-colors">
+                            <svg class="h-4.5 w-4.5 text-slate-550 group-hover:text-slate-700" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            เพิ่มเที่ยวรถจับไก่
+                        </button>
                     </div>
                 </div>
 
@@ -140,12 +149,10 @@
 
             let rowIndex = {{ old('items') ? count(old('items')) : 0 }};
 
-            // Get next auto-increment sequence for a house
             const getNextSequence = () => {
                 const houseId = houseSelect.value;
                 if (!houseId) return 1;
 
-                // Find number of rows currently in table
                 const currentRowsCount = tbody.querySelectorAll('.catch-row').length;
                 const dbNextSeq = Number(nextSequences[houseId] || 1);
                 return dbNextSeq + currentRowsCount;
@@ -161,6 +168,12 @@
                     </td>
                     <td class="px-4 py-2.5">
                         <input type="text" name="items[${rowIndex}][license_plate]" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500" placeholder="เช่น กข-1234" required>
+                    </td>
+                    <td class="px-4 py-2.5">
+                        <input type="number" min="0" name="items[${rowIndex}][birds_count]" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-right" required value="0">
+                    </td>
+                    <td class="px-4 py-2.5">
+                        <input type="number" min="0" name="items[${rowIndex}][boxes_count]" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-right" required value="0">
                     </td>
                     <td class="px-4 py-2.5">
                         <select name="items[${rowIndex}][vehicle_type]" class="w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -190,7 +203,6 @@
 
                 tbody.appendChild(tr);
 
-                // Bind delete event listener
                 tr.querySelector('.remove-row-btn').addEventListener('click', () => {
                     tr.remove();
                     recalculateSequences();
@@ -210,17 +222,13 @@
                 });
             };
 
-            // Recalculate sequences when house changes
             houseSelect.addEventListener('change', recalculateSequences);
-
             addRowBtn.addEventListener('click', addRow);
 
-            // Add first row default if no rows exist
             if (tbody.querySelectorAll('.catch-row').length === 0) {
                 addRow();
             }
 
-            // Bind existing remove buttons if any (e.g. from validation old values)
             document.querySelectorAll('.remove-row-btn').forEach((btn) => {
                 btn.addEventListener('click', (e) => {
                     e.currentTarget.closest('.catch-row').remove();

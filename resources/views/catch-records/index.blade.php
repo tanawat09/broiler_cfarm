@@ -86,7 +86,7 @@
                 </div>
             </form>
 
-            <div class="mb-5 grid gap-4 md:grid-cols-2">
+            <div class="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div class="rounded-xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-sm backdrop-blur">
                     <p class="text-xs font-semibold uppercase tracking-wider text-emerald-800">ยอดรวมค่าจับไก่ทั้งหมด</p>
                     <p class="mt-2 text-3xl font-extrabold text-emerald-950">฿{{ number_format($summary['total_fee'], 2) }}</p>
@@ -97,17 +97,29 @@
                     <p class="mt-2 text-3xl font-extrabold text-sky-950">{{ number_format($summary['total_trips']) }}</p>
                     <p class="mt-1 text-xs text-sky-700">เที่ยวคัน</p>
                 </div>
+                <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm backdrop-blur">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-indigo-800">จำนวนไก่ที่จับรวม</p>
+                    <p class="mt-2 text-3xl font-extrabold text-indigo-950">{{ number_format($summary['total_birds']) }}</p>
+                    <p class="mt-1 text-xs text-indigo-700">ตัว</p>
+                </div>
+                <div class="rounded-xl border border-amber-100 bg-amber-50/50 p-5 shadow-sm backdrop-blur">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-amber-800">จำนวนกล่องใส่ไก่รวม</p>
+                    <p class="mt-2 text-3xl font-extrabold text-amber-950">{{ number_format($summary['total_boxes']) }}</p>
+                    <p class="mt-1 text-xs text-amber-700">กล่อง</p>
+                </div>
             </div>
 
             <div class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
                 <div class="overflow-x-auto">
-                    <table class="min-w-[1100px] divide-y divide-slate-200 text-sm">
+                    <table class="min-w-[1200px] divide-y divide-slate-200 text-sm">
                         <thead class="bg-slate-50">
                             <tr>
                                 <th class="px-4 py-3 text-left font-medium text-slate-600">วันที่จับ</th>
                                 <th class="px-4 py-3 text-left font-medium text-slate-600">เล้า</th>
                                 <th class="px-4 py-3 text-center font-medium text-slate-600">คันที่/ลำดับ</th>
                                 <th class="px-4 py-3 text-left font-medium text-slate-600">ทะเบียน</th>
+                                <th class="px-4 py-3 text-right font-medium text-slate-600">จำนวนตัว</th>
+                                <th class="px-4 py-3 text-right font-medium text-slate-600">จำนวนกล่อง</th>
                                 <th class="px-4 py-3 text-left font-medium text-slate-600">ชนิดรถ</th>
                                 <th class="px-4 py-3 text-left font-medium text-slate-600">ทีมจับ</th>
                                 <th class="px-4 py-3 text-right font-medium text-slate-600">ค่าจับ (บาท)</th>
@@ -121,7 +133,9 @@
                                     <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ thai_date($record->catch_date) }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">เล้า {{ $record->house->house_no }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 text-center text-slate-700 font-mono">คันที่ {{ $record->sequence }}</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ $record->license_plate }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-slate-700 font-medium">{{ $record->license_plate }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-right text-slate-700 font-mono">{{ number_format($record->birds_count) }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-right text-slate-700 font-mono">{{ number_format($record->boxes_count) }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ $record->vehicle_type ?: '-' }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 text-slate-700">{{ $record->catching_team ?: '-' }}</td>
                                     <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-emerald-700">฿{{ number_format($record->catching_fee, 2) }}</td>
@@ -143,7 +157,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="px-4 py-8 text-center text-slate-500">ยังไม่มีประวัติการคีย์ข้อมูลคิดค่าจับไก่</td>
+                                    <td colspan="11" class="px-4 py-8 text-center text-slate-500">ยังไม่มีประวัติการคีย์ข้อมูลคิดค่าจับไก่</td>
                                 </tr>
                             @endforelse
                         </tbody>

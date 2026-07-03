@@ -29,7 +29,8 @@
                 @method('PUT')
 
                 <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
-                    <div class="grid gap-5 md:grid-cols-2">
+                    <!-- House and Catch Date in same row -->
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <x-input-label for="house_id" value="เลือกเล้า" class="font-semibold text-slate-700 text-xs" />
                             <select id="house_id" name="house_id" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500" required>
@@ -46,7 +47,7 @@
                         </div>
                     </div>
 
-                    <div class="grid gap-5 md:grid-cols-2">
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <x-input-label for="sequence" value="คันที่ / ลำดับที่" class="font-semibold text-slate-700 text-xs" />
                             <x-text-input id="sequence" name="sequence" type="number" min="1" class="mt-1 block w-full text-right" :value="old('sequence', $catchRecord->sequence)" required />
@@ -57,7 +58,19 @@
                         </div>
                     </div>
 
-                    <div class="grid gap-5 md:grid-cols-2">
+                    <!-- Birds Count and Boxes Count -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <x-input-label for="birds_count" value="จำนวนตัว" class="font-semibold text-slate-700 text-xs" />
+                            <x-text-input id="birds_count" name="birds_count" type="number" min="0" class="mt-1 block w-full text-right" :value="old('birds_count', $catchRecord->birds_count)" required />
+                        </div>
+                        <div>
+                            <x-input-label for="boxes_count" value="จำนวนกล่อง" class="font-semibold text-slate-700 text-xs" />
+                            <x-text-input id="boxes_count" name="boxes_count" type="number" min="0" class="mt-1 block w-full text-right" :value="old('boxes_count', $catchRecord->boxes_count)" required />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
                             <x-input-label for="vehicle_type" value="ชนิดรถ" class="font-semibold text-slate-700 text-xs" />
                             <select id="vehicle_type" name="vehicle_type" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">

@@ -59,6 +59,8 @@ class FlockCatchRecordController extends Controller
         $summary = [
             'total_fee' => (float) (clone $summaryQuery)->sum('catching_fee'),
             'total_trips' => (int) (clone $summaryQuery)->count(),
+            'total_birds' => (int) (clone $summaryQuery)->sum('birds_count'),
+            'total_boxes' => (int) (clone $summaryQuery)->sum('boxes_count'),
         ];
 
         return view('catch-records.index', compact(
@@ -110,6 +112,8 @@ class FlockCatchRecordController extends Controller
             'items' => 'required|array|min:1',
             'items.*.sequence' => 'required|integer|min:1',
             'items.*.license_plate' => 'required|string|max:50',
+            'items.*.birds_count' => 'required|integer|min:0',
+            'items.*.boxes_count' => 'required|integer|min:0',
             'items.*.vehicle_type' => 'nullable|string|max:50',
             'items.*.catching_team' => 'nullable|string|max:100',
             'items.*.catching_fee' => 'required|numeric|min:0',
@@ -129,6 +133,8 @@ class FlockCatchRecordController extends Controller
                 'catch_date' => CarbonImmutable::parse($validated['catch_date'])->toDateString(),
                 'sequence' => $item['sequence'],
                 'license_plate' => $item['license_plate'],
+                'birds_count' => $item['birds_count'],
+                'boxes_count' => $item['boxes_count'],
                 'vehicle_type' => $item['vehicle_type'] ?? null,
                 'catching_team' => $item['catching_team'] ?? null,
                 'catching_fee' => $item['catching_fee'],
@@ -170,6 +176,8 @@ class FlockCatchRecordController extends Controller
             'catch_date' => 'required|date',
             'sequence' => 'required|integer|min:1',
             'license_plate' => 'required|string|max:50',
+            'birds_count' => 'required|integer|min:0',
+            'boxes_count' => 'required|integer|min:0',
             'vehicle_type' => 'nullable|string|max:50',
             'catching_team' => 'nullable|string|max:100',
             'catching_fee' => 'required|numeric|min:0',
@@ -186,6 +194,8 @@ class FlockCatchRecordController extends Controller
             'catch_date' => CarbonImmutable::parse($validated['catch_date'])->toDateString(),
             'sequence' => $validated['sequence'],
             'license_plate' => $validated['license_plate'],
+            'birds_count' => $validated['birds_count'],
+            'boxes_count' => $validated['boxes_count'],
             'vehicle_type' => $validated['vehicle_type'],
             'catching_team' => $validated['catching_team'],
             'catching_fee' => $validated['catching_fee'],

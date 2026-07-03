@@ -17,6 +17,8 @@ class FlockCatchRecord extends Model
         'catch_date',
         'sequence',
         'license_plate',
+        'birds_count',
+        'boxes_count',
         'vehicle_type',
         'catching_team',
         'catching_fee',
@@ -30,6 +32,8 @@ class FlockCatchRecord extends Model
         return [
             'catch_date' => 'date',
             'sequence' => 'integer',
+            'birds_count' => 'integer',
+            'boxes_count' => 'integer',
             'catching_fee' => 'decimal:2',
         ];
     }

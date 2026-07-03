@@ -328,6 +328,7 @@ class DatabaseSeeder extends Seeder
                             'quantity_kg' => $quantityKg,
                         ],
                     );
+                }
             }
         });
 

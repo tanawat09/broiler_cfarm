@@ -49,6 +49,12 @@
             'icon' => 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z',
         ],
         [
+            'label' => 'ไก่เข้าเชือด นน.หน้าโรงงาน',
+            'href' => route('slaughter-records.shortcut'),
+            'active' => request()->is('slaughter-records') || request()->routeIs('flocks.slaughter-records.*'),
+            'icon' => 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2Zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2Z',
+        ],
+        [
             'label' => 'ปิดรุ่นการเลี้ยง',
             'href' => route('flock-close.shortcut'),
             'active' => request()->is('flock-close') || request()->routeIs('flocks.close.*'),

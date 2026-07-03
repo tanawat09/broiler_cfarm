@@ -13,11 +13,11 @@ FROM composer:2 AS vendor
 WORKDIR /app
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --ignore-platform-reqs
 COPY . .
 RUN composer dump-autoload --optimize
 
-FROM php:8.2-cli-alpine
+FROM php:8.3-cli-alpine
 
 WORKDIR /var/www/html
 

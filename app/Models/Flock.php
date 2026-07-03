@@ -57,4 +57,9 @@ class Flock extends Model
     {
         return $this->hasMany(FlockCatchRecord::class);
     }
+
+    public function slaughterRecords(): HasMany
+    {
+        return $this->hasMany(FlockSlaughterRecord::class);
+    }
 }

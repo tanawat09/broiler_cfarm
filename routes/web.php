@@ -20,6 +20,7 @@ use App\Http\Controllers\WaterMeterRecordController;
 use App\Http\Controllers\WeightRecordController;
 use App\Http\Controllers\FlockCatchRecordController;
 use App\Http\Controllers\CatchingTeamController;
+use App\Http\Controllers\FlockSlaughterRecordController;
 use App\Support\FarmAccess;
 use Illuminate\Support\Facades\Route;
 
@@ -93,6 +94,7 @@ Route::middleware('auth')->group(function () {
     })->name('sale-records.shortcut');
 
     Route::get('/catch-records', [FlockCatchRecordController::class, 'shortcut'])->name('catch-records.shortcut');
+    Route::get('/slaughter-records', [FlockSlaughterRecordController::class, 'shortcut'])->name('slaughter-records.shortcut');
 
     Route::get('/flock-close', function () {
         $flock = FarmAccess::activeFlockFor(request()->user());
@@ -126,6 +128,14 @@ Route::middleware('auth')->group(function () {
     Route::resource('/flocks/{flock}/catch-records', FlockCatchRecordController::class)
         ->names('flocks.catch-records')
         ->except(['show']);
+
+    Route::get('/flocks/{flock}/slaughter-records/upload', [FlockSlaughterRecordController::class, 'showUploadPage'])->name('flocks.slaughter-records.upload');
+    Route::post('/flocks/{flock}/slaughter-records/upload', [FlockSlaughterRecordController::class, 'handleUpload'])->name('flocks.slaughter-records.handle-upload');
+    Route::post('/flocks/{flock}/slaughter-records/config', [FlockSlaughterRecordController::class, 'handleConfig'])->name('flocks.slaughter-records.handle-config');
+    Route::post('/flocks/{flock}/slaughter-records/import', [FlockSlaughterRecordController::class, 'handleImport'])->name('flocks.slaughter-records.handle-import');
+    Route::resource('/flocks/{flock}/slaughter-records', FlockSlaughterRecordController::class)
+        ->names('flocks.slaughter-records')
+        ->only(['index', 'destroy']);
     Route::get('/flocks/{flock}/close', [FlockCloseController::class, 'show'])->name('flocks.close.show');
     Route::post('/flocks/{flock}/close', [FlockCloseController::class, 'close'])->name('flocks.close.store');
     Route::post('/flocks/{flock}/unlock', [FlockCloseController::class, 'unlock'])->name('flocks.close.unlock');

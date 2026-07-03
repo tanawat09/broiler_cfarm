@@ -52,4 +52,9 @@ class Flock extends Model
     {
         return $this->hasMany(FlockSaleRecord::class);
     }
+
+    public function catchRecords(): HasMany
+    {
+        return $this->hasMany(FlockCatchRecord::class);
+    }
 }

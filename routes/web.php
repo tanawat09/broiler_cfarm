@@ -18,6 +18,7 @@ use App\Http\Controllers\SalePriceMasterController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WaterMeterRecordController;
 use App\Http\Controllers\WeightRecordController;
+use App\Http\Controllers\FlockCatchRecordController;
 use App\Support\FarmAccess;
 use Illuminate\Support\Facades\Route;
 
@@ -90,6 +91,8 @@ Route::middleware('auth')->group(function () {
         return redirect()->route('flocks.sale-records.index', $flock);
     })->name('sale-records.shortcut');
 
+    Route::get('/catch-records', [FlockCatchRecordController::class, 'shortcut'])->name('catch-records.shortcut');
+
     Route::get('/flock-close', function () {
         $flock = FarmAccess::activeFlockFor(request()->user());
 
@@ -116,6 +119,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('feed-receipts', FeedReceiptController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
     Route::resource('/flocks/{flock}/sale-records', FlockSaleRecordController::class)
         ->names('flocks.sale-records')
+        ->except(['show']);
+
+    Route::resource('/flocks/{flock}/catch-records', FlockCatchRecordController::class)
+        ->names('flocks.catch-records')
         ->except(['show']);
     Route::get('/flocks/{flock}/close', [FlockCloseController::class, 'show'])->name('flocks.close.show');
     Route::post('/flocks/{flock}/close', [FlockCloseController::class, 'close'])->name('flocks.close.store');

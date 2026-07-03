@@ -102,7 +102,7 @@ class FlockSlaughterRecordController extends Controller
         $path = $file->store('temp');
 
         try {
-            $realPath = storage_path('app/' . $path);
+            $realPath = Storage::path($path);
             $spreadsheet = IOFactory::load($realPath);
             $sheetNames = $spreadsheet->getSheetNames();
         } catch (\Exception $e) {
@@ -143,7 +143,7 @@ class FlockSlaughterRecordController extends Controller
         ]);
 
         $tempPath = $validated['temp_path'];
-        $realPath = storage_path('app/' . $tempPath);
+        $realPath = Storage::path($tempPath);
 
         if (!Storage::exists($tempPath)) {
             return redirect()

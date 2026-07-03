@@ -184,11 +184,17 @@ class FlockSlaughterRecordController extends Controller
                 $problem_percent = (float) $sheet->getCell($validated['col_problem_percent'] . $row)->getValue();
                 $dead_weight = (float) $sheet->getCell($validated['col_dead_weight'] . $row)->getValue();
 
-                // Simple house matcher logic: e.g. "เล้า 1" -> "1", "01" -> "1"
+                // Simple house matcher logic: e.g. "เล้า 1" -> 1, "1001" -> 1, "1012" -> 12
                 $matchedHouseId = null;
                 $cleanedHouseName = preg_replace('/[^0-9]/', '', $rawHouse);
                 if (!empty($cleanedHouseName)) {
                     $houseNoInt = (int)$cleanedHouseName;
+                    
+                    // If it is in 1000s format (e.g., 1001, 1002, 1012...)
+                    if ($houseNoInt >= 1001 && $houseNoInt < 1100) {
+                        $houseNoInt = $houseNoInt % 1000;
+                    }
+                    
                     foreach ($availableHouses as $h) {
                         if ((int)$h->house_no === $houseNoInt) {
                             $matchedHouseId = $h->id;

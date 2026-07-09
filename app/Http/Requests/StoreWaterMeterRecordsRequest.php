@@ -17,6 +17,8 @@ class StoreWaterMeterRecordsRequest extends FormRequest
             'record_date' => ['required', 'date'],
             'meters' => ['required', 'array'],
             'meters.*' => ['nullable', 'integer', 'min:0'],
+            'previous_meters' => ['nullable', 'array'],
+            'previous_meters.*' => ['nullable', 'integer', 'min:0'],
         ];
     }
 
@@ -26,6 +28,8 @@ class StoreWaterMeterRecordsRequest extends FormRequest
             'record_date' => 'วันที่บันทึก',
             'meters' => 'เลขมิเตอร์น้ำ',
             'meters.*' => 'เลขมิเตอร์น้ำ',
+            'previous_meters' => 'เลขครั้งก่อน',
+            'previous_meters.*' => 'เลขครั้งก่อน',
         ];
     }
 }

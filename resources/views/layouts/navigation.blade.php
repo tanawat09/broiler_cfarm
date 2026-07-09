@@ -25,7 +25,13 @@
             'icon' => 'M6 2h9l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5M8 12h8M8 16h8M8 20h5',
         ],
         [
-            'label' => 'นำเข้าข้อมูล (.txt)',
+            'label' => 'บันทึกการให้ยา',
+            'href' => route('medicine-records.shortcut'),
+            'active' => request()->is('medicine-records') || request()->routeIs('flocks.medicine-records.*'),
+            'icon' => 'M9 3h6v5l4 7a4 4 0 0 1-3.5 6h-7A4 4 0 0 1 5 15l4-7V3Zm1 9h4m-5 4h6',
+        ],
+        [
+            'label' => 'นำเข้าข้อมูลการเลี้ยงประจำวัน (.txt)',
             'href' => route('daily-records.import-page'),
             'active' => request()->routeIs('daily-records.import-page'),
             'icon' => 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12',
@@ -49,7 +55,7 @@
             'icon' => 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z',
         ],
         [
-            'label' => 'ไก่เข้าเชือด นน.หน้าโรงงาน',
+            'label' => 'นำเข้าข้อมูลไก่เข้าเชือด นน.หน้าโรงงาน',
             'href' => route('slaughter-records.shortcut'),
             'active' => request()->is('slaughter-records') || request()->routeIs('flocks.slaughter-records.*'),
             'icon' => 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2Zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2Z',
@@ -89,6 +95,12 @@
             'href' => route('feed-summary.shortcut'),
             'active' => request()->is('feed-summary') || request()->is('flocks/*/feed-summary'),
             'icon' => 'M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z',
+        ],
+        [
+            'label' => 'สรุปผลการเลี้ยงประจำรุ่น',
+            'href' => route('production-report.shortcut'),
+            'active' => request()->is('production-report') || request()->is('flocks/*/production-report*'),
+            'icon' => 'M4 4h16v16H4V4Zm3 4h4v8H7V8Zm6 3h4v5h-4v-5Zm0-3h4v2h-4V8Z',
         ],
     ];
 
@@ -142,6 +154,13 @@
         'href' => route('sale-price-masters.index'),
         'active' => request()->routeIs('sale-price-masters.*'),
         'icon' => 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-1.2a4.2 4.2 0 0 1-2.4-1l1-1.7c.8.6 1.6.9 2.5.9.8 0 1.3-.3 1.3-.9 0-.5-.3-.8-1.7-1.2-1.8-.5-2.8-1.2-2.8-2.8 0-1.4.9-2.4 2.1-2.7V5h2v1.3c.8.2 1.5.5 2.1 1l-.9 1.7c-.7-.5-1.4-.7-2.1-.7-.7 0-1.1.3-1.1.8s.3.7 1.8 1.1c1.8.5 2.7 1.3 2.7 2.8 0 1.4-.9 2.4-2.5 2.8V17Z',
+    ];
+
+    $masterItems[] = [
+        'label' => 'มาสเตอร์ยา',
+        'href' => route('medicine-masters.index'),
+        'active' => request()->routeIs('medicine-masters.*'),
+        'icon' => 'M9 3h6v5l4 7a4 4 0 0 1-3.5 6h-7A4 4 0 0 1 5 15l4-7V3Zm1 9h4m-5 4h6',
     ];
 
     $masterItems[] = [

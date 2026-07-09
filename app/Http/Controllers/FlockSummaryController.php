@@ -68,10 +68,29 @@ class FlockSummaryController extends Controller
             ->orderBy('record_date')
             ->get();
 
+        $nextFlock = Flock::query()
+            ->where('farm_id', $flock->farm_id)
+            ->where('start_date', '>', $flock->start_date)
+            ->orderBy('start_date')
+            ->first();
+        $flockEndDate = $nextFlock 
+            ? CarbonImmutable::parse($nextFlock->start_date)->subDay() 
+            : null;
+
         $feedReceipts = FeedReceiptHouseItem::query()
             ->whereIn('house_id', $selectedHouseId ? [$selectedHouseId] : [])
-            ->whereHas('feedReceipt', function ($query) use ($flock, $startDate, $endDate) {
+            ->whereHas('feedReceipt', function ($query) use ($flock, $startDate, $endDate, $flockEndDate) {
                 $query->where('farm_id', $flock->farm_id)
+                    ->where(function ($q) use ($flock, $flockEndDate) {
+                        $q->where('flock_id', $flock->id)
+                          ->orWhere(function ($q2) use ($flock, $flockEndDate) {
+                              $q2->whereNull('flock_id')
+                                 ->whereDate('receipt_date', '>=', $flock->start_date->subDays(7)->toDateString());
+                              if ($flockEndDate) {
+                                  $q2->whereDate('receipt_date', '<=', $flockEndDate->toDateString());
+                              }
+                          });
+                    })
                     ->when($startDate, fn ($query) => $query->whereDate('receipt_date', '>=', $startDate))
                     ->when($endDate, fn ($query) => $query->whereDate('receipt_date', '<=', $endDate));
             })
@@ -158,6 +177,56 @@ class FlockSummaryController extends Controller
                     ];
                 }
 
+                $houseStartDate = $start->start_date ?: $flock->start_date;
+                $houseStartDateCarbon = CarbonImmutable::parse($houseStartDate)->startOfDay();
+                $houseStartDateStr = $houseStartDateCarbon->toDateString();
+
+                // Get all pre-placement feed receipt groups for this house
+                $prePlacementReceipts = $feedReceipts->filter(function ($items, $key) use ($start, $houseStartDateStr) {
+                    [$houseId, $dateStr] = explode('|', $key);
+                    return (int)$houseId === (int)$start->house_id && $dateStr < $houseStartDateStr;
+                });
+
+                $prePlacementRows = $prePlacementReceipts->map(function ($items, $key) use ($start, $flock, $houseStartDateCarbon) {
+                    [$houseId, $dateStr] = explode('|', $key);
+                    $dateCarbon = CarbonImmutable::parse($dateStr)->startOfDay();
+                    $daysDiff = (int) round(($dateCarbon->timestamp - $houseStartDateCarbon->timestamp) / 86400);
+                    $ageDay = $daysDiff + 1;
+
+                    $feedIn = (float) $items->sum(fn (FeedReceiptHouseItem $item) => (float) $item->quantity_kg);
+                    $feedCodes = $items->map(fn (FeedReceiptHouseItem $item) => $item->feedReceipt->feed_code)->filter()->unique()->implode(',');
+                    $feedLots = $items->map(fn (FeedReceiptHouseItem $item) => $item->feedReceipt->production_lot)->filter()->unique()->implode(',');
+
+                    return [
+                        'date' => $dateStr,
+                        'age_day' => $ageDay,
+                        'week_no' => 0,
+                        'feed_code' => $feedCodes,
+                        'feed_lots' => $feedLots,
+                        'feed_in' => $feedIn,
+                        'feed_used' => 0.0,
+                        'water_used' => 0,
+                        'temp_min' => null,
+                        'temp_max' => null,
+                        'humidity' => null,
+                        'dead_morning' => 0,
+                        'dead_evening' => 0,
+                        'cull_morning' => 0,
+                        'cull_evening' => 0,
+                        'dead_total' => 0,
+                        'cull_total' => 0,
+                        'loss_total' => 0,
+                        'medicine_note' => 'เตรียมอาหารก่อนเริ่มเลี้ยง (Pre-placement)',
+                        'remark' => 'เตรียมอาหารก่อนเริ่มเลี้ยง (Pre-placement)',
+                        'avg_weight' => null,
+                        'cumulative_loss' => 0,
+                        'remaining_birds' => $start->initial_birds,
+                        'mortality_rate' => 0.0,
+                        'latest_avg_weight' => null,
+                        'fcr' => null,
+                    ];
+                })->values();
+
                 $rows = $filteredByHouse->get($start->house_id, collect())
                     ->sortBy('record_date')
                     ->map(function (DailyHouseRecord $record) use ($start, $flock, $calculator, $snapshots, $feedReceipts) {
@@ -202,13 +271,15 @@ class FlockSummaryController extends Controller
                     })
                     ->values();
 
+                $combinedRows = $prePlacementRows->concat($rows)->sortBy('date')->values();
+
                 return [
                     'house' => $start->house,
                     'start_date' => $start->start_date ?: $flock->start_date,
                     'initial_birds' => $initialBirds,
                     'placement' => $placement,
-                    'rows' => $rows,
-                    'weekly_summaries' => $this->weeklySummaries($rows),
+                    'rows' => $combinedRows,
+                    'weekly_summaries' => $this->weeklySummaries($combinedRows),
                 ];
             })
             ->values();

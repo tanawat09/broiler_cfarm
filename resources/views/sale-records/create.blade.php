@@ -215,6 +215,32 @@
                     }
                 };
 
+                const parseLocalDate = (value) => {
+                    if (!value) {
+                        return null;
+                    }
+
+                    const parts = String(value).slice(0, 10).split('-').map(Number);
+                    if (parts.length !== 3 || parts.some(Number.isNaN)) {
+                        return null;
+                    }
+
+                    return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0, 0);
+                };
+
+                const calculateCatchAge = (placementDateStr, catchDateStr) => {
+                    const placementDate = parseLocalDate(placementDateStr);
+                    const catchDate = parseLocalDate(catchDateStr);
+
+                    if (!placementDate || !catchDate) {
+                        return null;
+                    }
+
+                    const diffTime = catchDate.getTime() - placementDate.getTime();
+
+                    return Math.round(diffTime / (1000 * 60 * 60 * 24));
+                };
+
                 // Dynamic catch age calculation
                 document.addEventListener('DOMContentLoaded', () => {
                     document.querySelectorAll('.house-date-input').forEach(input => {
@@ -225,17 +251,8 @@
                             
                             if (!ageSpan) return;
                             
-                            if (this.value && placementDateStr) {
-                                const catchDate = new Date(this.value);
-                                const placementDate = new Date(placementDateStr);
-                                
-                                // Set hours to 12 to normalize and avoid DST shift issues
-                                catchDate.setHours(12, 0, 0, 0);
-                                placementDate.setHours(12, 0, 0, 0);
-                                
-                                const diffTime = catchDate.getTime() - placementDate.getTime();
-                                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                                
+                            const diffDays = calculateCatchAge(placementDateStr, this.value);
+                            if (diffDays !== null) {
                                 ageSpan.textContent = diffDays >= 0 ? diffDays + ' วัน' : '0 วัน';
                             } else {
                                 ageSpan.textContent = '-';

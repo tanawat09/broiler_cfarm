@@ -32,7 +32,7 @@ services:
     container_name: broiler-db
     restart: unless-stopped
     ports:
-      - "3306:3306"
+      - "3319:3306"
     environment:
       MARIADB_DATABASE: broiler
       MARIADB_USER: broiler

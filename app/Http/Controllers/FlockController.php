@@ -82,12 +82,15 @@ class FlockController extends Controller
             foreach ($houses as $house) {
                 $placement = collect($placementsByHouse->get((string) $house->id, []));
                 $placementDate = $this->nullableDate($placement->get('placement_date'));
+                $hStartDate = $placementDate
+                    ? \Carbon\CarbonImmutable::parse($placementDate)->addDay()->toDateString()
+                    : $this->nullableDate($startDatesByHouse->get((string) $house->id));
 
                 FlockHouseStart::query()->create([
                     'flock_id' => $flock->id,
                     'house_id' => $house->id,
                     'initial_birds' => (int) $initialBirdsByHouse->get($house->id, 0),
-                    'start_date' => $placementDate ?: $this->nullableDate($startDatesByHouse->get((string) $house->id)),
+                    'start_date' => $hStartDate,
                 ]);
 
                 FlockHousePlacement::query()->create($this->placementPayload($flock->id, $house->id, $placement));
@@ -125,7 +128,7 @@ class FlockController extends Controller
         $houses = $flock->farm->houses()->where('is_active', true)->orderBy('house_no')->get();
         $startValues = $flock->flockHouseStarts()->pluck('initial_birds', 'house_id');
         $startDates = $flock->flockHouseStarts()->pluck('start_date', 'house_id');
-        $placementValues = $flock->flockHousePlacements()->get()->keyBy('house_id');
+        $placementValues = $this->aggregatePlacementValues($flock->flockHousePlacements()->get());
         $chickSources = $this->chickSourcesForForm();
 
         return view('flocks.edit', [
@@ -150,8 +153,12 @@ class FlockController extends Controller
         $startDatesByHouse = collect($validated['house_start_dates'] ?? []);
         $flockStartDate = $this->flockStartDate($validated, $placementsByHouse);
         $initialBirdsTotal = $houses->sum(fn ($house) => (int) $initialBirdsByHouse->get($house->id, 0));
+        $existingPlacementCounts = $flock->flockHousePlacements()
+            ->select('house_id', DB::raw('COUNT(*) as row_count'))
+            ->groupBy('house_id')
+            ->pluck('row_count', 'house_id');
 
-        DB::transaction(function () use ($flock, $validated, $houses, $initialBirdsByHouse, $startDatesByHouse, $placementsByHouse, $flockStartDate, $initialBirdsTotal): void {
+        DB::transaction(function () use ($flock, $validated, $houses, $initialBirdsByHouse, $startDatesByHouse, $placementsByHouse, $flockStartDate, $initialBirdsTotal, $existingPlacementCounts): void {
             $flock->update([
                 'flock_code' => $validated['flock_code'],
                 'chicken_type' => $validated['chicken_type'],
@@ -164,6 +171,10 @@ class FlockController extends Controller
                 $placement = collect($placementsByHouse->get((string) $house->id, []));
                 $placementDate = $this->nullableDate($placement->get('placement_date'));
 
+                $hStartDate = $placementDate
+                    ? \Carbon\CarbonImmutable::parse($placementDate)->addDay()->toDateString()
+                    : $this->nullableDate($startDatesByHouse->get((string) $house->id));
+
                 FlockHouseStart::query()->updateOrCreate(
                     [
                         'flock_id' => $flock->id,
@@ -171,9 +182,13 @@ class FlockController extends Controller
                     ],
                     [
                         'initial_birds' => (int) $initialBirdsByHouse->get($house->id, 0),
-                        'start_date' => $placementDate ?: $this->nullableDate($startDatesByHouse->get((string) $house->id)),
+                        'start_date' => $hStartDate,
                     ],
                 );
+
+                if ((int) $existingPlacementCounts->get($house->id, 0) > 1) {
+                    continue;
+                }
 
                 FlockHousePlacement::query()->updateOrCreate(
                     [
@@ -261,6 +276,46 @@ class FlockController extends Controller
         });
     }
 
+    private function aggregatePlacementValues($placements)
+    {
+        return $placements
+            ->groupBy('house_id')
+            ->map(function ($housePlacements) {
+                $housePlacements = collect($housePlacements);
+                $firstPlacement = $housePlacements->sortBy('placement_date')->first();
+                $lastPlacement = $housePlacements->whereNotNull('catch_date')->sortByDesc('catch_date')->first();
+                $maleTotal = (int) $housePlacements->sum('male_count');
+                $femaleTotal = (int) $housePlacements->sum('female_count');
+                $maleGradeA = (int) $housePlacements->sum('male_grade_a_count');
+                $maleGradeB = (int) $housePlacements->sum('male_grade_b_count');
+                $femaleGradeA = (int) $housePlacements->sum('female_grade_a_count');
+                $femaleGradeB = (int) $housePlacements->sum('female_grade_b_count');
+
+                $aggregate = collect([
+                    '_is_aggregate' => $housePlacements->count() > 1,
+                    'placement_date' => $firstPlacement?->placement_date,
+                    'catch_date' => $lastPlacement?->catch_date,
+                    'catch_age' => $housePlacements->whereNotNull('catch_age')->max('catch_age'),
+                    'chicks_in' => (int) $housePlacements->sum('chicks_in'),
+                    'male_count' => $maleTotal,
+                    'female_count' => $femaleTotal,
+                    'male_grade_a_count' => $maleGradeA,
+                    'male_grade_b_count' => $maleGradeB,
+                    'female_grade_a_count' => $femaleGradeA,
+                    'female_grade_b_count' => $femaleGradeB,
+                    'chick_source' => $housePlacements->pluck('chick_source')->filter()->unique()->implode(', '),
+                    'chick_code' => $housePlacements->pluck('chick_code')->filter()->unique()->implode(', '),
+                    'batch_no' => $housePlacements->pluck('batch_no')->filter()->unique()->implode(', '),
+                    'breed' => $housePlacements->pluck('breed')->filter()->unique()->implode(', '),
+                ]);
+
+                $aggregate->put('chick_grade', $this->chickGrade($aggregate));
+                $aggregate->put('sex', $this->sex($aggregate));
+
+                return $aggregate->all();
+            });
+    }
+
     private function nullableDate(mixed $value): ?string
     {
         return $value === null || $value === '' ? null : (string) $value;
@@ -274,7 +329,11 @@ class FlockController extends Controller
             ->sort()
             ->values();
 
-        return (string) ($placementDates->first() ?: ($validated['start_date'] ?? now()->toDateString()));
+        if ($placementDates->isNotEmpty()) {
+            return \Carbon\CarbonImmutable::parse($placementDates->first())->addDay()->toDateString();
+        }
+
+        return (string) ($validated['start_date'] ?? now()->toDateString());
     }
 
     private function initialBirdsByHouse($houses, $placementsByHouse, $fallbackByHouse)

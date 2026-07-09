@@ -47,7 +47,6 @@ class FlockCatchRecordController extends Controller
             ->when($houseId, fn ($query) => $query->where('house_id', $houseId))
             ->when($startDate, fn ($query) => $query->whereDate('catch_date', '>=', $startDate))
             ->when($endDate, fn ($query) => $query->whereDate('catch_date', '<=', $endDate))
-            ->orderByDesc('catch_date')
             ->orderBy('sequence')
             ->orderBy('id')
             ->paginate(15)
@@ -136,13 +135,17 @@ class FlockCatchRecordController extends Controller
             }
         }
 
-        foreach ($validated['items'] as $item) {
+        $nextSequence = ((int) FlockCatchRecord::query()
+            ->where('flock_id', $flock->id)
+            ->max('sequence')) + 1;
+
+        foreach ($validated['items'] as $index => $item) {
             FlockCatchRecord::create([
                 'farm_id' => $flock->farm_id,
                 'flock_id' => $flock->id,
                 'house_id' => $item['house_id'],
                 'catch_date' => CarbonImmutable::parse($item['catch_date'])->toDateString(),
-                'sequence' => $item['sequence'],
+                'sequence' => $nextSequence + $index,
                 'license_plate' => $item['license_plate'],
                 'birds_count' => $item['birds_count'],
                 'boxes_count' => $item['boxes_count'],
@@ -288,6 +291,7 @@ class FlockCatchRecordController extends Controller
         $flock->load('farm');
 
         [$teamPaymentRows, $teamPaymentSummary] = $this->teamPaymentData($flock);
+        [$housePaymentRows, $housePaymentSummary] = $this->housePaymentData($flock);
         $catchRecords = FlockCatchRecord::query()
             ->where('flock_id', $flock->id)
             ->with('house')
@@ -299,6 +303,8 @@ class FlockCatchRecordController extends Controller
             'flock' => $flock,
             'teamPaymentRows' => $teamPaymentRows,
             'teamPaymentSummary' => $teamPaymentSummary,
+            'housePaymentRows' => $housePaymentRows,
+            'housePaymentSummary' => $housePaymentSummary,
             'catchRecords' => $catchRecords,
             'withholdingRate' => 0.03,
             'generatedAt' => now(),
@@ -392,5 +398,32 @@ class FlockCatchRecordController extends Controller
         ];
 
         return [$teamPaymentRows, $teamPaymentSummary];
+    }
+
+    private function housePaymentData(Flock $flock): array
+    {
+        $housePaymentRows = FlockCatchRecord::query()
+            ->where('flock_id', $flock->id)
+            ->join('houses', 'houses.id', '=', 'flock_catch_records.house_id')
+            ->selectRaw('houses.house_no, COUNT(*) as total_trips, SUM(flock_catch_records.birds_count) as total_birds, SUM(flock_catch_records.boxes_count) as total_boxes, SUM(flock_catch_records.catching_fee) as total_fee')
+            ->groupBy('houses.house_no')
+            ->orderByRaw('CAST(houses.house_no AS UNSIGNED)')
+            ->get()
+            ->map(fn ($row) => [
+                'house_no' => $row->house_no,
+                'total_trips' => (int) $row->total_trips,
+                'total_birds' => (int) $row->total_birds,
+                'total_boxes' => (int) $row->total_boxes,
+                'total_fee' => (float) $row->total_fee,
+            ]);
+
+        $housePaymentSummary = [
+            'total_trips' => (int) $housePaymentRows->sum('total_trips'),
+            'total_birds' => (int) $housePaymentRows->sum('total_birds'),
+            'total_boxes' => (int) $housePaymentRows->sum('total_boxes'),
+            'total_fee' => (float) $housePaymentRows->sum('total_fee'),
+        ];
+
+        return [$housePaymentRows, $housePaymentSummary];
     }
 }

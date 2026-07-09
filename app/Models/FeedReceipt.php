@@ -13,6 +13,7 @@ class FeedReceipt extends Model
 
     protected $fillable = [
         'farm_id',
+        'flock_id',
         'receipt_date',
         'feed_code',
         'production_lot',
@@ -31,6 +32,11 @@ class FeedReceipt extends Model
     public function farm(): BelongsTo
     {
         return $this->belongsTo(Farm::class);
+    }
+
+    public function flock(): BelongsTo
+    {
+        return $this->belongsTo(Flock::class);
     }
 
     public function items(): HasMany

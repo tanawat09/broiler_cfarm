@@ -12,6 +12,7 @@ use App\Support\FarmAccess;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -49,7 +50,7 @@ class FeedReceiptController extends Controller
         }
 
         $receipts = FeedReceipt::query()
-            ->with(['farm', 'items.house'])
+            ->with(['farm', 'flock', 'items.house'])
             ->withSum('items as total_quantity_kg', 'quantity_kg')
             ->whereIn('farm_id', $farmIds)
             ->when($selectedFarmId, fn ($query) => $query->where('farm_id', $selectedFarmId))
@@ -106,18 +107,66 @@ class FeedReceiptController extends Controller
 
     public function create(): View
     {
+        $hasFlockColumn = $this->feedReceiptsHasFlockColumn();
         $farms = FarmAccess::farmsQuery(request()->user())->orderBy('farm_name')->get();
-        $selectedFarm = $this->selectedFarm($farms);
-        $receiptDate = request('receipt_date', now()->toDateString());
-        $activeFlock = $selectedFarm
-            ? Flock::query()
+        $flockOptions = FarmAccess::flocksQuery(request()->user())
+            ->with('farm', 'flockHouseStarts')
+            ->orderBy('farm_id')
+            ->latest('start_date')
+            ->latest('id')
+            ->get();
+        $selectedFlock = $this->selectedFlock($flockOptions);
+        $selectedFarm = $selectedFlock?->farm ?: $this->selectedFarm($farms);
+        $receiptDate = request('receipt_date');
+        $activeFlock = $selectedFlock;
+
+        if (! $activeFlock && $selectedFarm) {
+            $activeFlock = $flockOptions
                 ->where('farm_id', $selectedFarm->id)
                 ->where('status', 'active')
-                ->with('flockHouseStarts')
-                ->latest('start_date')
+                ->sortByDesc('start_date')
+                ->first();
+        }
+
+        $dateExplanation = '';
+        if ($activeFlock) {
+            $latestReceiptQuery = FeedReceipt::query()
+                ->where('farm_id', $selectedFarm->id)
+                ->whereDate('receipt_date', '>=', $activeFlock->start_date->toDateString());
+
+            if ($hasFlockColumn) {
+                $latestReceiptQuery->where(function ($query) use ($activeFlock) {
+                    $query->where('flock_id', $activeFlock->id)
+                        ->orWhereNull('flock_id');
+                });
+            }
+
+            $latestReceipt = $latestReceiptQuery
+                ->latest('receipt_date')
                 ->latest('id')
-                ->first()
-            : null;
+                ->first();
+
+            if ($latestReceipt) {
+                $latestDate = \Carbon\Carbon::parse($latestReceipt->receipt_date);
+                $suggestedDate = $latestDate->copy()->addDay();
+                $dateExplanation = "แนะนำตามวันถัดไปของการรับอาหารล่าสุดในรุ่นนี้: " . thai_date($suggestedDate->toDateString()) . " (คำนวณจาก วันรับล่าสุด " . thai_date($latestDate->toDateString()) . " + 1 วัน)";
+                if (!$receiptDate) {
+                    $receiptDate = $suggestedDate->toDateString();
+                }
+            } else {
+                $flockStartDate = \Carbon\Carbon::parse($activeFlock->start_date);
+                $dateExplanation = "แนะนำตามวันที่เริ่มต้นรุ่นการเลี้ยง: " . thai_date($flockStartDate->toDateString()) . " (คำนวณจาก วันเริ่มรุ่น " . thai_date($flockStartDate->toDateString()) . " เนื่องจากยังไม่มีบันทึกรับอาหารในรุ่นนี้)";
+                if (!$receiptDate) {
+                    $receiptDate = $flockStartDate->toDateString();
+                }
+            }
+        } else {
+            $dateExplanation = "แนะนำตามวันที่ปัจจุบัน (เนื่องจากไม่พบรุ่นการเลี้ยงที่กำลังเลี้ยงอยู่)";
+            if (!$receiptDate) {
+                $receiptDate = now()->toDateString();
+            }
+        }
+
         $houses = $selectedFarm
             ? $selectedFarm->houses()->where('is_active', true)->orderBy('house_no')->get()
             : collect();
@@ -128,9 +177,11 @@ class FeedReceiptController extends Controller
 
         return view('feed-receipts.create', [
             'farms' => $farms,
+            'flockOptions' => $flockOptions,
             'selectedFarm' => $selectedFarm,
             'activeFlock' => $activeFlock,
             'receiptDate' => $receiptDate,
+            'dateExplanation' => $dateExplanation,
             'houses' => $houses,
             'ageByHouse' => $ageByHouse,
         ]);
@@ -138,9 +189,22 @@ class FeedReceiptController extends Controller
 
     public function store(StoreFeedReceiptRequest $request): RedirectResponse
     {
+        $hasFlockColumn = $this->feedReceiptsHasFlockColumn();
         $validated = $request->validated();
         $farm = Farm::query()->findOrFail($validated['farm_id']);
         FarmAccess::ensureFarm($request->user(), $farm);
+        $flock = null;
+
+        if ($hasFlockColumn && ! empty($validated['flock_id'])) {
+            $flock = Flock::query()->findOrFail($validated['flock_id']);
+            FarmAccess::ensureFlock($request->user(), $flock);
+
+            if ((int) $flock->farm_id !== (int) $farm->id) {
+                throw ValidationException::withMessages([
+                    'flock_id' => 'รุ่นการเลี้ยงต้องอยู่ในฟาร์มเดียวกับรายการรับอาหาร',
+                ]);
+            }
+        }
 
         $allowedHouseIds = $farm->houses()->where('is_active', true)->pluck('id')->map(fn ($id) => (int) $id)->all();
         $items = collect($validated['items'])
@@ -153,8 +217,8 @@ class FeedReceiptController extends Controller
             ]);
         }
 
-        $receipt = DB::transaction(function () use ($validated, $items, $request) {
-            $receipt = FeedReceipt::query()->create([
+        $receipt = DB::transaction(function () use ($validated, $items, $request, $hasFlockColumn) {
+            $receiptData = [
                 'farm_id' => $validated['farm_id'],
                 'receipt_date' => $validated['receipt_date'],
                 'feed_code' => $validated['feed_code'],
@@ -162,7 +226,13 @@ class FeedReceiptController extends Controller
                 'remark' => null,
                 'created_by' => $request->user()?->id,
                 'updated_by' => $request->user()?->id,
-            ]);
+            ];
+
+            if ($hasFlockColumn) {
+                $receiptData['flock_id'] = $validated['flock_id'] ?? null;
+            }
+
+            $receipt = FeedReceipt::query()->create($receiptData);
 
             foreach ($items as $houseId => $quantityKg) {
                 FeedReceiptHouseItem::query()->create([
@@ -184,7 +254,7 @@ class FeedReceiptController extends Controller
     {
         FarmAccess::ensureFeedReceipt(request()->user(), $feedReceipt);
 
-        $feedReceipt->load(['farm', 'items.house', 'creator']);
+        $feedReceipt->load(['farm', 'flock', 'items.house', 'creator']);
 
         return view('feed-receipts.show', compact('feedReceipt'));
     }
@@ -211,6 +281,26 @@ class FeedReceiptController extends Controller
         return $farms->first();
     }
 
+    private function selectedFlock($flockOptions): ?Flock
+    {
+        $flockId = request()->integer('flock_id');
+
+        if ($flockId) {
+            return $flockOptions->firstWhere('id', $flockId);
+        }
+
+        return null;
+    }
+
+    private function feedReceiptsHasFlockColumn(): bool
+    {
+        try {
+            return Schema::hasColumn('feed_receipts', 'flock_id');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     private function attachFlockCodesToReceipts($receipts, $flockOptions, $flockEndDates): void
     {
         $flocksByFarm = $flockOptions
@@ -219,6 +309,11 @@ class FeedReceiptController extends Controller
 
         $receipts->each(function (FeedReceipt $receipt) use ($flocksByFarm, $flockEndDates): void {
             $receiptDate = $receipt->receipt_date->toDateString();
+            if ($receipt->flock) {
+                $receipt->matched_flock_code = $receipt->flock->flock_code;
+                return;
+            }
+
             $matchedFlock = $flocksByFarm
                 ->get($receipt->farm_id, collect())
                 ->first(function (Flock $flock) use ($receiptDate, $flockEndDates): bool {

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreFlockRequest extends FormRequest
 {
@@ -15,7 +16,13 @@ class StoreFlockRequest extends FormRequest
     {
         return [
             'farm_id' => ['required', 'exists:farms,id'],
-            'flock_code' => ['required', 'string', 'max:255'],
+            'flock_code' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('flocks', 'flock_code')
+                    ->where(fn ($query) => $query->where('farm_id', $this->input('farm_id'))),
+            ],
             'chicken_type' => ['required', 'string', 'max:255'],
             'start_date' => ['required', 'date'],
             'note' => ['nullable', 'string'],
@@ -41,6 +48,21 @@ class StoreFlockRequest extends FormRequest
             'placements.*.sex' => ['nullable', 'string', 'max:255'],
             'placements.*.breed' => ['nullable', 'string', 'max:255'],
             'redirect_to' => ['nullable', 'string'],
+        ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'flock_code' => trim((string) $this->input('flock_code')),
+            'chicken_type' => trim((string) $this->input('chicken_type')),
+        ]);
+    }
+
+    public function messages(): array
+    {
+        return [
+            'flock_code.unique' => 'ฟาร์มนี้มีรุ่นการเลี้ยงนี้อยู่แล้ว กรุณาใช้รหัสรุ่นอื่น',
         ];
     }
 

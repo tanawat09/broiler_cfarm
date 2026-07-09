@@ -6,6 +6,7 @@ use App\Http\Requests\StoreFlockSaleRecordRequest;
 use App\Http\Requests\UpdateFlockSaleRecordRequest;
 use App\Models\DailyHouseRecord;
 use App\Models\Flock;
+use App\Models\FlockCatchRecord;
 use App\Models\FlockSaleRecord;
 use App\Models\SalePriceMaster;
 use App\Support\FarmAccess;
@@ -219,16 +220,29 @@ class FlockSaleRecordController extends Controller
     public function houseSaleContext(Flock $flock)
     {
         $flock->loadMissing('flockHousePlacements');
-        $placementsByHouse = $flock->flockHousePlacements->keyBy('house_id');
+        $placementsByHouse = $flock->flockHousePlacements->groupBy('house_id');
+
+        $catchDatesSub = FlockCatchRecord::query()
+            ->where('flock_id', $flock->id)
+            ->selectRaw('house_id, MAX(catch_date) as catch_date')
+            ->groupBy('house_id');
 
         $lossesByHouse = DailyHouseRecord::query()
-            ->where('flock_id', $flock->id)
+            ->leftJoinSub($catchDatesSub, 'catch_dates', function ($join) {
+                $join->on('daily_house_records.house_id', '=', 'catch_dates.house_id');
+            })
+            ->where('daily_house_records.flock_id', $flock->id)
+            ->where(function ($query) {
+                $query
+                    ->whereNull('catch_dates.catch_date')
+                    ->orWhereColumn('daily_house_records.record_date', '<=', 'catch_dates.catch_date');
+            })
             ->selectRaw('
-                house_id,
+                daily_house_records.house_id,
                 COALESCE(SUM(dead_morning + dead_evening + cull_morning + cull_evening), 0) as loss_total,
-                MAX(record_date) as last_record_date
+                MAX(daily_house_records.record_date) as last_record_date
             ')
-            ->groupBy('house_id')
+            ->groupBy('daily_house_records.house_id')
             ->get()
             ->keyBy('house_id');
 
@@ -247,16 +261,28 @@ class FlockSaleRecordController extends Controller
             ->get()
             ->keyBy('house_id');
 
+        $catchDatesByHouse = FlockCatchRecord::query()
+            ->where('flock_id', $flock->id)
+            ->selectRaw('house_id, MAX(catch_date) as catch_date')
+            ->groupBy('house_id')
+            ->get()
+            ->keyBy('house_id');
+
         return $flock->flockHouseStarts
             ->sortBy('house.house_no')
-            ->mapWithKeys(function ($start) use ($lossesByHouse, $latestWeights, $salesByHouse, $placementsByHouse, $flock) {
+            ->mapWithKeys(function ($start) use ($lossesByHouse, $latestWeights, $salesByHouse, $placementsByHouse, $catchDatesByHouse, $flock) {
                 $loss = (int) ($lossesByHouse->get($start->house_id)?->loss_total ?? 0);
                 $sold = (int) ($salesByHouse->get($start->house_id)?->birds_sold ?? 0);
                 $remaining = max(0, (int) $start->initial_birds - $loss - $sold);
                 $avgWeight = $latestWeights->get($start->house_id);
-                $placement = $placementsByHouse->get($start->house_id);
-                $catchDate = $placement?->catch_date ? $placement->catch_date->toDateString() : null;
-                $placementDate = $placement?->placement_date ?: ($start->start_date ?: $flock->start_date);
+                $housePlacements = $placementsByHouse->get($start->house_id) ?: collect();
+                $placementDate = $housePlacements->whereNotNull('placement_date')->min('placement_date') ?: ($start->start_date ?: $flock->start_date);
+                $placementCatchDate = $housePlacements->whereNotNull('catch_date')->max('catch_date');
+                $catchDate = $placementCatchDate
+                    ? CarbonImmutable::parse($placementCatchDate)->toDateString()
+                    : ($catchDatesByHouse->get($start->house_id)?->catch_date
+                        ? CarbonImmutable::parse($catchDatesByHouse->get($start->house_id)->catch_date)->toDateString()
+                        : null);
                 $placementDateStr = $placementDate ? $placementDate->toDateString() : null;
 
                 return [

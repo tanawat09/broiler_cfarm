@@ -49,4 +49,9 @@ class House extends Model
     {
         return $this->hasMany(FlockSaleRecord::class);
     }
+
+    public function flockMedicineRecords(): HasMany
+    {
+        return $this->hasMany(FlockMedicineRecord::class);
+    }
 }

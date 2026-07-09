@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DailyHouseRecord;
 use App\Models\Flock;
+use App\Models\FlockCatchRecord;
 use App\Models\FlockSaleRecord;
 use App\Services\PoultryCalculationService;
 use App\Support\FarmAccess;
@@ -105,10 +106,23 @@ class FlockCloseController extends Controller
 
     private function closingRows(Flock $flock, PoultryCalculationService $calculator): Collection
     {
-        $lossesByHouse = DailyHouseRecord::query()
+        $catchDatesSub = FlockCatchRecord::query()
             ->where('flock_id', $flock->id)
+            ->selectRaw('house_id, MAX(catch_date) as catch_date')
+            ->groupBy('house_id');
+
+        $lossesByHouse = DailyHouseRecord::query()
+            ->leftJoinSub($catchDatesSub, 'catch_dates', function ($join) {
+                $join->on('daily_house_records.house_id', '=', 'catch_dates.house_id');
+            })
+            ->where('daily_house_records.flock_id', $flock->id)
+            ->where(function ($query) {
+                $query
+                    ->whereNull('catch_dates.catch_date')
+                    ->orWhereColumn('daily_house_records.record_date', '<=', 'catch_dates.catch_date');
+            })
             ->selectRaw('
-                house_id,
+                daily_house_records.house_id,
                 COALESCE(SUM(dead_morning), 0) as dead_morning,
                 COALESCE(SUM(dead_evening), 0) as dead_evening,
                 COALESCE(SUM(cull_morning), 0) as cull_morning,
@@ -116,7 +130,7 @@ class FlockCloseController extends Controller
                 COALESCE(SUM(feed_used), 0) as feed_used,
                 COALESCE(SUM(water_used), 0) as water_used
             ')
-            ->groupBy('house_id')
+            ->groupBy('daily_house_records.house_id')
             ->get()
             ->keyBy('house_id');
 

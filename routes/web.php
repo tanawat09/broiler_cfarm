@@ -9,6 +9,7 @@ use App\Http\Controllers\FeedReceiptController;
 use App\Http\Controllers\FeedIntakeMasterController;
 use App\Http\Controllers\FlockController;
 use App\Http\Controllers\FlockCloseController;
+use App\Http\Controllers\FlockProductionReportController;
 use App\Http\Controllers\FlockSaleRecordController;
 use App\Http\Controllers\FlockSummaryController;
 use App\Http\Controllers\HouseController;
@@ -21,6 +22,8 @@ use App\Http\Controllers\WeightRecordController;
 use App\Http\Controllers\FlockCatchRecordController;
 use App\Http\Controllers\CatchingTeamController;
 use App\Http\Controllers\FlockSlaughterRecordController;
+use App\Http\Controllers\FlockMedicineRecordController;
+use App\Http\Controllers\MedicineMasterController;
 use App\Support\FarmAccess;
 use Illuminate\Support\Facades\Route;
 
@@ -95,6 +98,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/catch-records', [FlockCatchRecordController::class, 'shortcut'])->name('catch-records.shortcut');
     Route::get('/slaughter-records', [FlockSlaughterRecordController::class, 'shortcut'])->name('slaughter-records.shortcut');
+    Route::get('/medicine-records', [FlockMedicineRecordController::class, 'shortcut'])->name('medicine-records.shortcut');
 
     Route::get('/flock-close', function () {
         $flock = FarmAccess::activeFlockFor(request()->user());
@@ -116,6 +120,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('users', UserController::class)->except(['show']);
     Route::resource('chick-sources', ChickSourceController::class)->except(['show']);
     Route::resource('catching-teams', CatchingTeamController::class)->except(['show']);
+    Route::resource('medicine-masters', MedicineMasterController::class)->only(['index', 'store', 'destroy']);
     Route::resource('chick-price-masters', ChickPriceMasterController::class)->only(['index', 'store', 'destroy']);
     Route::resource('sale-price-masters', SalePriceMasterController::class)->only(['index', 'store', 'destroy']);
     Route::resource('feed-intake-masters', FeedIntakeMasterController::class)->only(['index', 'store', 'destroy']);
@@ -153,6 +158,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/daily-records/import', [DailyRecordImportController::class, 'handleImport'])->name('daily-records.import-submit');
     Route::get('/flocks/{flock}/water-meters', [WaterMeterRecordController::class, 'index'])->name('flocks.water-meters.index');
     Route::post('/flocks/{flock}/water-meters', [WaterMeterRecordController::class, 'store'])->name('flocks.water-meters.store');
+    Route::get('/flocks/{flock}/medicine-records', [FlockMedicineRecordController::class, 'index'])->name('flocks.medicine-records.index');
+    Route::post('/flocks/{flock}/medicine-records', [FlockMedicineRecordController::class, 'store'])->name('flocks.medicine-records.store');
     Route::get('/flocks/{flock}/summary', FlockSummaryController::class)->name('flocks.summary');
     Route::get('/flocks/{flock}/losses', \App\Http\Controllers\FlockLossReportController::class)->name('flocks.losses');
     Route::get('/losses', function () {
@@ -174,6 +181,11 @@ Route::middleware('auth')->group(function () {
         }
         return redirect()->route('flocks.feed-summary', $flock);
     })->name('feed-summary.shortcut');
+    Route::get('/flocks/{flock}/production-report', [FlockProductionReportController::class, 'show'])->name('flocks.production-report.show');
+    Route::post('/flocks/{flock}/production-report/adjustments', [FlockProductionReportController::class, 'updateAdjustments'])->name('flocks.production-report.adjustments');
+    Route::get('/flocks/{flock}/production-report.pdf', [FlockProductionReportController::class, 'pdf'])->name('flocks.production-report.pdf');
+    Route::get('/flocks/{flock}/production-report.xlsx', [FlockProductionReportController::class, 'excel'])->name('flocks.production-report.excel');
+    Route::get('/production-report', [FlockProductionReportController::class, 'shortcut'])->name('production-report.shortcut');
     Route::get('/flocks/{flock}/placements', [\App\Http\Controllers\FlockPlacementController::class, 'index'])->name('flocks.placements.index');
     Route::post('/flocks/{flock}/placements', [\App\Http\Controllers\FlockPlacementController::class, 'store'])->name('flocks.placements.store');
     Route::get('/placements', [\App\Http\Controllers\FlockPlacementController::class, 'shortcut'])->name('placements.shortcut');

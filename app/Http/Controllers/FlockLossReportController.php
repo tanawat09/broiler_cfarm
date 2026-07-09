@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DailyHouseRecord;
 use App\Models\Flock;
+use App\Models\FlockCatchRecord;
 use App\Models\FeedReceiptHouseItem;
 use App\Models\FlockSaleRecord;
 use App\Support\FarmAccess;
@@ -18,7 +19,7 @@ class FlockLossReportController extends Controller
         $user = $request->user();
         FarmAccess::ensureFlock($user, $flock);
 
-        $flock->load(['farm', 'flockHouseStarts.house']);
+        $flock->load(['farm', 'flockHouseStarts.house', 'flockHousePlacements']);
 
         // Determine tabs
         $tab = $request->query('tab', 'summary');
@@ -65,6 +66,12 @@ class FlockLossReportController extends Controller
         }
 
         $placementsByHouse = $flock->flockHousePlacements->groupBy('house_id');
+        $catchRecordsByHouse = FlockCatchRecord::query()
+            ->where('flock_id', $flock->id)
+            ->selectRaw('house_id, MAX(catch_date) as catch_date')
+            ->groupBy('house_id')
+            ->get()
+            ->keyBy('house_id');
 
         // 2. Summary Tab Calculations
         $summaryRows = [];
@@ -86,13 +93,25 @@ class FlockLossReportController extends Controller
         foreach ($houses as $start) {
             $housePlacements = $placementsByHouse->get($start->house_id) ?: collect();
             $earliestPlacement = $housePlacements->sortBy('placement_date')->first();
+            $latestPlacementCatchDate = $housePlacements->whereNotNull('catch_date')->max('catch_date');
             $houseStartDate = $earliestPlacement?->placement_date ?: ($start->start_date ?: $flock->start_date);
+            $catchDate = $latestPlacementCatchDate
+                ? CarbonImmutable::parse($latestPlacementCatchDate)
+                : ($catchRecordsByHouse->get($start->house_id)?->catch_date
+                    ? CarbonImmutable::parse($catchRecordsByHouse->get($start->house_id)->catch_date)
+                    : null);
+            $catchAge = $catchDate
+                ? (int) CarbonImmutable::parse($houseStartDate)->diffInDays($catchDate)
+                : null;
+            $lossCutoffDate = $catchDate && $catchDate->lessThan($selectedDate)
+                ? $catchDate
+                : $selectedDate;
             $initialBirds = (int) $start->initial_birds;
 
-            // Get records for this house up to selected date
+            // คิดยอดสูญเสียเหมือนหน้าปิดรุ่น: ถ้าเล้านี้มีวันที่จับแล้ว ให้ตัดยอดถึงวันจับของเล้านั้นเท่านั้น
             $records = DailyHouseRecord::where('flock_id', $flock->id)
                 ->where('house_id', $start->house_id)
-                ->whereDate('record_date', '<=', $selectedDate)
+                ->whereDate('record_date', '<=', $lossCutoffDate)
                 ->get();
 
             // Age calculation
@@ -147,6 +166,9 @@ class FlockLossReportController extends Controller
                 'remaining' => $remaining,
                 'feed_used' => $feedUsed,
                 'feed_received' => $feedReceived,
+                'placement_date' => CarbonImmutable::parse($houseStartDate)->toDateString(),
+                'catch_date' => $catchDate?->toDateString(),
+                'catch_age' => $catchAge,
             ];
 
             // Accumulate to totals

@@ -381,6 +381,7 @@
                             <thead class="bg-slate-50 text-slate-600">
                                 <tr>
                                     <th class="px-4 py-3 font-semibold">เล้า</th>
+                                    <th class="px-4 py-3 font-semibold">วันที่ลง</th>
                                     <th class="px-4 py-3 font-semibold">วันที่จับ</th>
                                     <th class="px-4 py-3 text-right font-semibold">อายุจับ</th>
                                     <th class="px-4 py-3 text-right font-semibold">ไก่เริ่มต้น</th>
@@ -420,6 +421,9 @@
                                             @else
                                                 เล้า {{ $start->house->house_no }}
                                             @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                            {{ $placementDateStr ? thai_date($placementDateStr) : '-' }}
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3">
                                             <input type="date" 
@@ -716,6 +720,32 @@
                 });
             }
 
+            const parseLocalDate = (value) => {
+                if (!value) {
+                    return null;
+                }
+
+                const parts = String(value).slice(0, 10).split('-').map(Number);
+                if (parts.length !== 3 || parts.some(Number.isNaN)) {
+                    return null;
+                }
+
+                return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0, 0);
+            };
+
+            const calculateCatchAge = (placementDateStr, catchDateStr) => {
+                const placementDate = parseLocalDate(placementDateStr);
+                const catchDate = parseLocalDate(catchDateStr);
+
+                if (!placementDate || !catchDate) {
+                    return null;
+                }
+
+                const diffTime = catchDate.getTime() - placementDate.getTime();
+
+                return Math.round(diffTime / (1000 * 60 * 60 * 24));
+            };
+
             // Dynamic catch age calculation
             document.querySelectorAll('.house-date-input').forEach(input => {
                 input.addEventListener('change', function() {
@@ -725,17 +755,8 @@
                     
                     if (!ageSpan) return;
                     
-                    if (this.value && placementDateStr) {
-                        const catchDate = new Date(this.value);
-                        const placementDate = new Date(placementDateStr);
-                        
-                        // Set hours to 12 to normalize and avoid DST shift issues
-                        catchDate.setHours(12, 0, 0, 0);
-                        placementDate.setHours(12, 0, 0, 0);
-                        
-                        const diffTime = catchDate.getTime() - placementDate.getTime();
-                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                        
+                    const diffDays = calculateCatchAge(placementDateStr, this.value);
+                    if (diffDays !== null) {
                         ageSpan.textContent = diffDays >= 0 ? diffDays + ' วัน' : '0 วัน';
                     } else {
                         ageSpan.textContent = '-';

@@ -114,7 +114,7 @@
                                     <!-- 1. ข้อมูลลงไก่ -->
                                     <th class="py-3.5 px-3 text-center border-r border-slate-100 bg-slate-100/50 w-16 sticky left-0 z-10">เล้า</th>
                                     <th class="py-3.5 px-3 text-center border-r border-slate-100">วันที่ลงไก่</th>
-                                    <th class="py-3.5 px-3 text-center border-r border-slate-100">วันที่จับขาย</th>
+                                    <th class="py-3.5 px-3 text-center border-r border-slate-100">วันที่จับไก่</th>
                                     <th class="py-3.5 px-3 text-right border-r border-slate-100">อายุจับ (วัน)</th>
                                     <th class="py-3.5 px-3 text-right bg-emerald-50/20 text-emerald-950 font-bold border-r border-slate-150">จำนวนไก่เข้า (ตัว)</th>
                                     <th class="py-3.5 px-3 text-right text-slate-600">เพศผู้ (M)</th>
@@ -161,9 +161,9 @@
                                         $firstPlacement = $housePlacements->sortBy('placement_date')->first();
                                         $lastPlacement = $housePlacements->whereNotNull('catch_date')->sortByDesc('catch_date')->first();
 
-                                        $placementDate = $firstPlacement?->placement_date;
-                                        $catchDate = $lastPlacement?->catch_date;
-                                        $catchAge = $housePlacements->whereNotNull('catch_age')->max('catch_age');
+                                        $placementDate = $row['placement_date'] ?? $firstPlacement?->placement_date;
+                                        $catchDate = $row['catch_date'] ?? $lastPlacement?->catch_date;
+                                        $catchAge = $row['catch_age'] ?? $housePlacements->whereNotNull('catch_age')->max('catch_age');
                                         $maleCount = $housePlacements->sum('male_count');
                                         $femaleCount = $housePlacements->sum('female_count');
                                         $maleGradeA = $housePlacements->sum('male_grade_a_count');
@@ -206,7 +206,7 @@
                                         <td class="whitespace-nowrap py-3.5 px-3 text-center font-medium border-r border-slate-100">
                                             {{ $placementDate ? thai_date($placementDate) : thai_date($start?->start_date ?: $flock->start_date) }}
                                         </td>
-                                        <!-- วันที่จับขาย -->
+                                        <!-- วันที่จับไก่ -->
                                         <td class="whitespace-nowrap py-3.5 px-3 text-center text-slate-500 border-r border-slate-100">
                                             {{ $catchDate ? thai_date($catchDate) : '-' }}
                                         </td>

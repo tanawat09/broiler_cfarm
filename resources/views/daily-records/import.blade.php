@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h1 class="text-xl font-semibold text-gray-900">นำเข้าข้อมูลประจำวัน (.txt)</h1>
+        <h1 class="text-xl font-semibold text-gray-900">นำเข้าข้อมูลการเลี้ยงประจำวัน (.txt)</h1>
     </x-slot>
 
     <div class="py-6">

@@ -20,10 +20,10 @@ class WaterMeterRecordController extends Controller
         $user = $request->user();
         FarmAccess::ensureFlock($user, $flock);
 
+        $flock->load(['farm', 'flockHouseStarts.house']);
         $recordDate = $request->query('date')
             ? CarbonImmutable::parse($request->query('date'))->toDateString()
-            : now()->toDateString();
-        $flock->load(['farm', 'flockHouseStarts.house']);
+            : $this->defaultRecordDate($flock);
         $farms = FarmAccess::farmsQuery($user)->orderBy('farm_name')->get();
         $flockOptions = FarmAccess::flocksQuery($user)
             ->with('farm')
@@ -43,11 +43,14 @@ class WaterMeterRecordController extends Controller
             ->get()
             ->keyBy('house_id');
         $previousRecordsByHouse = DailyHouseRecord::query()
-            ->where('flock_id', $flock->id)
-            ->whereDate('record_date', '<', $recordDate)
+            ->join('flocks', 'flocks.id', '=', 'daily_house_records.flock_id')
+            ->where('flocks.farm_id', $flock->farm_id)
+            ->whereIn('daily_house_records.house_id', $houses->pluck('id'))
+            ->whereDate('daily_house_records.record_date', '<', $recordDate)
             ->whereNotNull('water_meter_reading')
-            ->orderByDesc('record_date')
-            ->get()
+            ->orderByDesc('daily_house_records.record_date')
+            ->orderByDesc('daily_house_records.id')
+            ->get('daily_house_records.*')
             ->unique('house_id')
             ->keyBy('house_id');
         $ageDay = $this->ageDay($flock, $recordDate);
@@ -75,10 +78,12 @@ class WaterMeterRecordController extends Controller
         $flock->load(['flockHouseStarts.house']);
         $houseIds = $flock->flockHouseStarts->pluck('house_id')->map(fn ($id) => (int) $id)->all();
         $meters = collect($validated['meters'] ?? []);
+        $previousMeters = collect($validated['previous_meters'] ?? []);
         $userId = $request->user()?->id;
 
-        DB::transaction(function () use ($flock, $recordDate, $houseIds, $meters, $userId): void {
+        DB::transaction(function () use ($flock, $recordDate, $houseIds, $meters, $previousMeters, $userId): void {
             $startsByHouse = $flock->flockHouseStarts->keyBy('house_id');
+            $waterErrors = [];
 
             foreach ($houseIds as $houseId) {
                 $ageDay = $this->ageDayForHouse($flock, $startsByHouse->get($houseId), $recordDate);
@@ -92,6 +97,21 @@ class WaterMeterRecordController extends Controller
                 $currentMeter = $hasSubmittedMeter
                     ? ($rawMeter === null || $rawMeter === '' ? null : (int) $rawMeter)
                     : $existingRecord?->water_meter_reading;
+                $previousRecord = $this->previousWaterMeterRecord($flock->farm_id, $houseId, $recordDate);
+                $hasSubmittedPreviousMeter = $previousMeters->has($houseId) || $previousMeters->has((string) $houseId);
+                $rawPreviousMeter = $previousMeters->get($houseId, $previousMeters->get((string) $houseId));
+                $initialPreviousMeter = $hasSubmittedPreviousMeter && ($rawPreviousMeter !== null && $rawPreviousMeter !== '')
+                    ? (int) $rawPreviousMeter
+                    : null;
+                $waterUsed = (int) ($existingRecord?->water_used ?? 0);
+
+                if (! $previousRecord && $currentMeter !== null && $initialPreviousMeter !== null) {
+                    if ($currentMeter < $initialPreviousMeter) {
+                        $waterErrors["meters.$houseId"] = 'เลขมิเตอร์วันนี้ต้องไม่น้อยกว่าเลขครั้งก่อน';
+                    } else {
+                        $waterUsed = $currentMeter - $initialPreviousMeter;
+                    }
+                }
 
                 DailyHouseRecord::query()->updateOrCreate(
                     [
@@ -105,7 +125,7 @@ class WaterMeterRecordController extends Controller
                         'feed_in' => (float) ($existingRecord?->feed_in ?? 0),
                         'feed_used' => (float) ($existingRecord?->feed_used ?? 0),
                         'water_meter_reading' => $currentMeter,
-                        'water_used' => (int) ($existingRecord?->water_used ?? 0),
+                        'water_used' => $waterUsed,
                         'temp_min' => $existingRecord?->temp_min,
                         'temp_max' => $existingRecord?->temp_max,
                         'humidity' => $existingRecord?->humidity,
@@ -122,11 +142,15 @@ class WaterMeterRecordController extends Controller
                 );
             }
 
-            foreach ($houseIds as $houseId) {
-                $this->recalculateWaterUsage($flock->id, $houseId);
+            if ($waterErrors !== []) {
+                throw ValidationException::withMessages($waterErrors);
             }
 
-            $errors = $this->waterMeterErrors($flock->id, $recordDate);
+            foreach ($houseIds as $houseId) {
+                $this->recalculateWaterUsage($flock->farm_id, $houseId);
+            }
+
+            $errors = $this->waterMeterErrors($flock->farm_id, $houseIds, $recordDate);
 
             if ($errors !== []) {
                 throw ValidationException::withMessages($errors);
@@ -146,6 +170,21 @@ class WaterMeterRecordController extends Controller
         return (int) max(1, CarbonImmutable::parse($flock->start_date)->diffInDays(CarbonImmutable::parse($recordDate)) + 1);
     }
 
+    private function defaultRecordDate(Flock $flock): string
+    {
+        $latestRecordDate = DailyHouseRecord::query()
+            ->join('flocks', 'flocks.id', '=', 'daily_house_records.flock_id')
+            ->where('flocks.farm_id', $flock->farm_id)
+            ->whereNotNull('daily_house_records.water_meter_reading')
+            ->max('daily_house_records.record_date');
+
+        if ($latestRecordDate) {
+            return CarbonImmutable::parse($latestRecordDate)->addDay()->toDateString();
+        }
+
+        return CarbonImmutable::parse($flock->start_date)->toDateString();
+    }
+
     private function ageDayForHouse(Flock $flock, mixed $start, string $recordDate): int
     {
         $houseStartDate = $start?->start_date ?: $flock->start_date;
@@ -153,33 +192,51 @@ class WaterMeterRecordController extends Controller
         return (int) max(1, CarbonImmutable::parse($houseStartDate)->diffInDays(CarbonImmutable::parse($recordDate)) + 1);
     }
 
-    private function recalculateWaterUsage(int $flockId, int $houseId): void
+    private function previousWaterMeterRecord(int $farmId, int $houseId, string $recordDate): ?DailyHouseRecord
+    {
+        return DailyHouseRecord::query()
+            ->join('flocks', 'flocks.id', '=', 'daily_house_records.flock_id')
+            ->where('flocks.farm_id', $farmId)
+            ->where('daily_house_records.house_id', $houseId)
+            ->whereDate('daily_house_records.record_date', '<', $recordDate)
+            ->whereNotNull('daily_house_records.water_meter_reading')
+            ->orderByDesc('daily_house_records.record_date')
+            ->orderByDesc('daily_house_records.id')
+            ->first('daily_house_records.*');
+    }
+
+    private function recalculateWaterUsage(int $farmId, int $houseId): void
     {
         $records = DailyHouseRecord::query()
-            ->where('flock_id', $flockId)
-            ->where('house_id', $houseId)
-            ->whereNotNull('water_meter_reading')
-            ->orderBy('record_date')
-            ->get();
+            ->join('flocks', 'flocks.id', '=', 'daily_house_records.flock_id')
+            ->where('flocks.farm_id', $farmId)
+            ->where('daily_house_records.house_id', $houseId)
+            ->whereNotNull('daily_house_records.water_meter_reading')
+            ->orderBy('daily_house_records.record_date')
+            ->orderBy('daily_house_records.id')
+            ->get('daily_house_records.*');
         $previousMeter = null;
 
         foreach ($records as $record) {
             $currentMeter = (int) $record->water_meter_reading;
-            $record->water_used = $previousMeter === null ? 0 : max(0, $currentMeter - $previousMeter);
+            $record->water_used = $previousMeter === null ? (int) $record->water_used : max(0, $currentMeter - $previousMeter);
             $record->save();
             $previousMeter = $currentMeter;
         }
     }
 
-    private function waterMeterErrors(int $flockId, string $submittedDate): array
+    private function waterMeterErrors(int $farmId, array $houseIds, string $submittedDate): array
     {
         $errors = [];
         $recordsByHouse = DailyHouseRecord::query()
-            ->where('flock_id', $flockId)
+            ->join('flocks', 'flocks.id', '=', 'daily_house_records.flock_id')
+            ->where('flocks.farm_id', $farmId)
+            ->whereIn('daily_house_records.house_id', $houseIds)
             ->whereNotNull('water_meter_reading')
-            ->orderBy('house_id')
-            ->orderBy('record_date')
-            ->get()
+            ->orderBy('daily_house_records.house_id')
+            ->orderBy('daily_house_records.record_date')
+            ->orderBy('daily_house_records.id')
+            ->get('daily_house_records.*')
             ->groupBy('house_id');
 
         foreach ($recordsByHouse as $houseId => $records) {

@@ -9,6 +9,7 @@ use App\Models\FlockHousePlacement;
 use App\Models\FlockHouseStart;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use App\Support\FarmAccess;
 
 class FlockPlacementController extends Controller
@@ -34,11 +35,24 @@ class FlockPlacementController extends Controller
 
     public function createFlock(Request $request)
     {
+        $request->merge([
+            'flock_code' => trim((string) $request->input('flock_code')),
+            'chicken_type' => trim((string) $request->input('chicken_type')),
+        ]);
+
         $validated = $request->validate([
             'farm_id' => 'required|exists:farms,id',
-            'flock_code' => 'required|string|max:255',
+            'flock_code' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('flocks', 'flock_code')
+                    ->where(fn ($query) => $query->where('farm_id', $request->input('farm_id'))),
+            ],
             'start_date' => 'required|date',
             'chicken_type' => 'required|string|max:255',
+        ], [
+            'flock_code.unique' => 'ฟาร์มนี้มีรุ่นการเลี้ยงนี้อยู่แล้ว กรุณาใช้รหัสรุ่นอื่น',
         ]);
 
         $farm = Farm::findOrFail($validated['farm_id']);
@@ -186,9 +200,14 @@ class FlockPlacementController extends Controller
                             }
                         }
 
+                        $pDate = $row['placement_date'] ?: $flock->start_date->toDateString();
+                        if ($earliestPlacementDate === null || $pDate < $earliestPlacementDate) {
+                            $earliestPlacementDate = $pDate;
+                        }
+
                         $flock->flockHousePlacements()->create([
                             'house_id' => $houseId,
-                            'placement_date' => $row['placement_date'] ?: $flock->start_date,
+                            'placement_date' => $pDate,
                             'chicks_in' => $chicksIn,
                             'male_count' => $maleCount,
                             'female_count' => $femaleCount,
@@ -208,11 +227,27 @@ class FlockPlacementController extends Controller
                     }
                 }
 
-                // Update start initial birds for daily loss calculations
-                $start->update([
+                // Update start initial birds and start_date (+1 day after placement) for daily loss calculations
+                $startUpdateData = [
                     'initial_birds' => $totalHouseChicks
-                ]);
+                ];
+                if ($earliestPlacementDate) {
+                    $startUpdateData['start_date'] = \Carbon\CarbonImmutable::parse($earliestPlacementDate)->addDay()->toDateString();
+                }
+                $start->update($startUpdateData);
             }
+
+            // Recalculate total initial birds and earliest start date for the entire flock
+            $totalFlockBirds = (int) $flock->flockHouseStarts()->sum('initial_birds');
+            $earliestFlockStart = $flock->flockHouseStarts()->whereNotNull('start_date')->min('start_date');
+
+            $flockUpdateData = [
+                'initial_birds' => $totalFlockBirds
+            ];
+            if ($earliestFlockStart) {
+                $flockUpdateData['start_date'] = $earliestFlockStart;
+            }
+            $flock->update($flockUpdateData);
         });
 
         return redirect()

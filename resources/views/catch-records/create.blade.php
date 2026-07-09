@@ -32,6 +32,9 @@
                     <div class="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
                         <h2 class="text-sm font-bold text-slate-900">รายละเอียดเที่ยวรถจับไก่</h2>
                         <p class="text-xs text-slate-500 mt-0.5">ระบุรายละเอียดการจับไก่ของรถแต่ละคันเป็นรายแถว (สามารถจับหลายคันและสลับเล้า/วันที่ได้ตามจริง)</p>
+                        <p class="mt-2 inline-flex rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                            ระบบจะรันคันที่/ลำดับต่อจากรายการเดิมอัตโนมัติ โดยรายการใหม่จะเริ่มที่คันที่ {{ number_format($nextSequence) }}
+                        </p>
                     </div>
 
                     <div class="overflow-x-auto">

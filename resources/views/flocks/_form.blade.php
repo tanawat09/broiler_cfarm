@@ -51,6 +51,12 @@
         <div class="text-sm text-gray-500">ช่องไก่เข้าใช้เป็นจำนวนไก่เริ่มต้นของเล้านั้น</div>
     </div>
 
+    <div class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        ถ้าเล้ามีข้อมูลลูกไก่มากกว่า 1 แถว หน้านี้จะแสดงเป็นยอดรวมรายเล้าเท่านั้น และจะล็อกช่องรายละเอียดไว้
+        หากต้องการแก้ข้อมูลรายแถว ให้ไปที่
+        <a href="{{ route('flocks.placements.index', $flock) }}" class="font-semibold underline">ข้อมูลลูกไก่</a>
+    </div>
+
     <div class="overflow-hidden rounded-md border border-gray-200">
         <div class="overflow-x-auto">
             <table class="min-w-[2050px] divide-y divide-gray-200 text-xs">
@@ -83,6 +89,10 @@
                     @forelse ($houses as $house)
                         @php
                             $placement = $placementValues->get($house->id);
+                            $isAggregatePlacement = (bool) data_get($placement, '_is_aggregate', false);
+                            $aggregateInputAttributes = $isAggregatePlacement ? 'readonly' : '';
+                            $aggregateSelectAttributes = $isAggregatePlacement ? 'disabled' : '';
+                            $aggregateCellClass = $isAggregatePlacement ? ' bg-amber-50/50' : '';
                             $value = fn ($field, $default = '') => old('placements.'.$house->id.'.'.$field, data_get($placement, $field, $default));
                             $dateValue = function ($field) use ($house, $placement) {
                                 $oldValue = old('placements.'.$house->id.'.'.$field);
@@ -95,16 +105,19 @@
                                 return $storedValue ? \Carbon\CarbonImmutable::parse($storedValue)->format('Y-m-d') : '';
                             };
                         @endphp
-                        <tr class="placement-row hover:bg-gray-50">
+                        <tr class="placement-row hover:bg-gray-50 {{ $isAggregatePlacement ? 'bg-amber-50/20' : '' }}">
                             <td class="whitespace-nowrap border-r border-gray-100 px-3 py-2 text-center font-medium text-gray-900">
                                 {{ $house->house_no }}
+                                @if ($isAggregatePlacement)
+                                    <div class="mt-1 text-[10px] font-semibold text-amber-700">ยอดรวม</div>
+                                @endif
                             </td>
                             <td class="border-r border-gray-100 px-2 py-2">
-                                <input data-placement-date type="date" name="placements[{{ $house->id }}][placement_date]" value="{{ $dateValue('placement_date') }}" class="w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <input data-placement-date type="date" name="placements[{{ $house->id }}][placement_date]" value="{{ $dateValue('placement_date') }}" {!! $aggregateInputAttributes !!} class="w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500{{ $aggregateCellClass }}">
                                 <x-input-error class="mt-1 text-left" :messages="$errors->get('placements.'.$house->id.'.placement_date')" />
                             </td>
                             <td class="border-r border-gray-100 px-2 py-2">
-                                <input data-catch-date type="date" name="placements[{{ $house->id }}][catch_date]" value="{{ $dateValue('catch_date') }}" class="w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <input data-catch-date type="date" name="placements[{{ $house->id }}][catch_date]" value="{{ $dateValue('catch_date') }}" {!! $aggregateInputAttributes !!} class="w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500{{ $aggregateCellClass }}">
                                 <x-input-error class="mt-1 text-left" :messages="$errors->get('placements.'.$house->id.'.catch_date')" />
                             </td>
                             <td class="border-r border-gray-100 px-2 py-2 text-right">
@@ -112,17 +125,17 @@
                             </td>
                             <td class="border-r border-gray-100 px-2 py-2 text-right">
                                 <input type="hidden" name="house_initial_birds[{{ $house->id }}]" value="{{ old('placements.'.$house->id.'.chicks_in', data_get($placement, 'chicks_in', $startValues->get($house->id, ''))) }}">
-                                <input type="number" min="0" step="1" name="placements[{{ $house->id }}][chicks_in]" value="{{ old('placements.'.$house->id.'.chicks_in', data_get($placement, 'chicks_in', $startValues->get($house->id, ''))) }}" class="w-24 rounded-md border-gray-300 text-right text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <input type="number" min="0" step="1" name="placements[{{ $house->id }}][chicks_in]" value="{{ old('placements.'.$house->id.'.chicks_in', data_get($placement, 'chicks_in', $startValues->get($house->id, ''))) }}" {!! $aggregateInputAttributes !!} class="w-24 rounded-md border-gray-300 text-right text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500{{ $aggregateCellClass }}">
                                 <x-input-error class="mt-1 text-left" :messages="$errors->get('placements.'.$house->id.'.chicks_in')" />
                             </td>
                             @foreach (['male_count', 'female_count', 'male_grade_a_count', 'male_grade_b_count', 'female_grade_a_count', 'female_grade_b_count'] as $field)
                                 <td class="border-r border-gray-100 px-2 py-2 text-right">
-                                    <input data-grade-field="{{ $field }}" type="number" min="0" step="1" name="placements[{{ $house->id }}][{{ $field }}]" value="{{ $value($field) }}" class="w-20 rounded-md border-gray-300 text-right text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <input data-grade-field="{{ $field }}" type="number" min="0" step="1" name="placements[{{ $house->id }}][{{ $field }}]" value="{{ $value($field) }}" {!! $aggregateInputAttributes !!} class="w-20 rounded-md border-gray-300 text-right text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500{{ $aggregateCellClass }}">
                                     <x-input-error class="mt-1 text-left" :messages="$errors->get('placements.'.$house->id.'.'.$field)" />
                                 </td>
                             @endforeach
                             <td class="border-r border-gray-100 px-2 py-2">
-                                <select name="placements[{{ $house->id }}][chick_source]" class="w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <select name="placements[{{ $house->id }}][chick_source]" {!! $aggregateSelectAttributes !!} class="w-32 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500{{ $aggregateCellClass }}">
                                     <option value="">-</option>
                                     @foreach ($chickSources as $source)
                                         <option value="{{ $source->name }}" @selected($value('chick_source') === $source->name)>{{ $source->name }}</option>
@@ -133,16 +146,16 @@
                                 <input data-chick-grade type="text" name="placements[{{ $house->id }}][chick_grade]" value="{{ $value('chick_grade') }}" class="w-20 rounded-md border-gray-300 bg-emerald-50 text-center text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500" readonly>
                             </td>
                             <td class="border-r border-gray-100 px-2 py-2">
-                                <textarea name="placements[{{ $house->id }}][chick_code]" rows="1" class="w-80 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ $value('chick_code') }}</textarea>
+                                <textarea name="placements[{{ $house->id }}][chick_code]" rows="1" {!! $aggregateInputAttributes !!} class="w-80 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500{{ $aggregateCellClass }}">{{ $value('chick_code') }}</textarea>
                             </td>
                             <td class="border-r border-gray-100 px-2 py-2">
-                                <input type="text" name="placements[{{ $house->id }}][batch_no]" value="{{ $value('batch_no') }}" class="w-28 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <input type="text" name="placements[{{ $house->id }}][batch_no]" value="{{ $value('batch_no') }}" {!! $aggregateInputAttributes !!} class="w-28 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500{{ $aggregateCellClass }}">
                             </td>
                             <td class="border-r border-gray-100 px-2 py-2">
                                 <input data-sex type="text" name="placements[{{ $house->id }}][sex]" value="{{ $value('sex') }}" class="w-20 rounded-md border-gray-300 bg-emerald-50 text-center text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500" readonly>
                             </td>
                             <td class="px-2 py-2">
-                                <input type="text" name="placements[{{ $house->id }}][breed]" value="{{ $value('breed') }}" class="w-24 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <input type="text" name="placements[{{ $house->id }}][breed]" value="{{ $value('breed') }}" {!! $aggregateInputAttributes !!} class="w-24 rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500{{ $aggregateCellClass }}">
                             </td>
                         </tr>
                     @empty

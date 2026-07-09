@@ -166,9 +166,9 @@
                                     @php
                                         $runningFeedIn += $row['feed_in'];
                                         $nextRow = $table['rows']->get($loop->index + 1);
-                                        $isWeekEnd = ! $nextRow || $nextRow['week_no'] !== $row['week_no'];
+                                        $isWeekEnd = ($row['week_no'] > 0) && (! $nextRow || $nextRow['week_no'] !== $row['week_no']);
                                     @endphp
-                                    <tr class="hover:bg-gray-50">
+                                    <tr class="hover:bg-gray-50 @if ($row['age_day'] <= 0) bg-slate-50/75 text-slate-500 italic @endif">
                                          @php
                                              $dayOfWeek = (($row['age_day'] - 1) % 7) + 1;
                                          @endphp

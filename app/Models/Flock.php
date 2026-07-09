@@ -62,4 +62,9 @@ class Flock extends Model
     {
         return $this->hasMany(FlockSlaughterRecord::class);
     }
+
+    public function medicineRecords(): HasMany
+    {
+        return $this->hasMany(FlockMedicineRecord::class);
+    }
 }

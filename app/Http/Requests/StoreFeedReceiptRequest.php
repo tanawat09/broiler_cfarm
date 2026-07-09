@@ -15,6 +15,7 @@ class StoreFeedReceiptRequest extends FormRequest
     {
         return [
             'farm_id' => ['required', 'exists:farms,id'],
+            'flock_id' => ['nullable', 'exists:flocks,id'],
             'receipt_date' => ['required', 'date'],
             'feed_code' => ['required', 'in:203,204,205'],
             'production_lot' => ['required', 'string', 'max:255'],
@@ -28,6 +29,7 @@ class StoreFeedReceiptRequest extends FormRequest
     {
         return [
             'farm_id' => 'ฟาร์ม',
+            'flock_id' => 'รุ่นการเลี้ยง',
             'receipt_date' => 'วันที่รับ',
             'feed_code' => 'เบอร์อาหาร',
             'production_lot' => 'เลขที่ผลิต',

@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Flock;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateFlockRequest extends FormRequest
 {
@@ -13,8 +15,19 @@ class UpdateFlockRequest extends FormRequest
 
     public function rules(): array
     {
+        $flock = $this->route('flock');
+        $flockId = $flock instanceof Flock ? $flock->getKey() : $flock;
+        $farmId = $flock instanceof Flock ? $flock->farm_id : null;
+
         return [
-            'flock_code' => ['required', 'string', 'max:255'],
+            'flock_code' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('flocks', 'flock_code')
+                    ->when($farmId, fn ($rule) => $rule->where(fn ($query) => $query->where('farm_id', $farmId)))
+                    ->ignore($flockId),
+            ],
             'chicken_type' => ['required', 'string', 'max:255'],
             'start_date' => ['required', 'date'],
             'note' => ['nullable', 'string'],
@@ -39,6 +52,21 @@ class UpdateFlockRequest extends FormRequest
             'placements.*.batch_no' => ['nullable', 'string', 'max:255'],
             'placements.*.sex' => ['nullable', 'string', 'max:255'],
             'placements.*.breed' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'flock_code' => trim((string) $this->input('flock_code')),
+            'chicken_type' => trim((string) $this->input('chicken_type')),
+        ]);
+    }
+
+    public function messages(): array
+    {
+        return [
+            'flock_code.unique' => 'ฟาร์มนี้มีรุ่นการเลี้ยงนี้อยู่แล้ว กรุณาใช้รหัสรุ่นอื่น',
         ];
     }
 

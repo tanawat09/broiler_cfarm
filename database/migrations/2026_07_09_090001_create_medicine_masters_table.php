@@ -9,33 +9,35 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('medicine_masters', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->string('default_unit')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->text('note')->nullable();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('medicine_masters')) {
+            Schema::create('medicine_masters', function (Blueprint $table) {
+                $table->id();
+                $table->string('name')->unique();
+                $table->string('default_unit')->nullable();
+                $table->boolean('is_active')->default(true);
+                $table->text('note')->nullable();
+                $table->timestamps();
+            });
 
-        DB::table('medicine_masters')->insert([
-            [
-                'name' => 'Soludox',
-                'default_unit' => 'กรัม',
-                'is_active' => true,
-                'note' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'name' => 'Poulvac IB QX+Hipraviar-CLON',
-                'default_unit' => 'โดส',
-                'is_active' => true,
-                'note' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
+            DB::table('medicine_masters')->insert([
+                [
+                    'name' => 'Soludox',
+                    'default_unit' => 'กรัม',
+                    'is_active' => true,
+                    'note' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+                [
+                    'name' => 'Poulvac IB QX+Hipraviar-CLON',
+                    'default_unit' => 'โดส',
+                    'is_active' => true,
+                    'note' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+            ]);
+        }
     }
 
     public function down(): void

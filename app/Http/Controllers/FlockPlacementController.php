@@ -129,13 +129,24 @@ class FlockPlacementController extends Controller
     public function store(Flock $flock, Request $request)
     {
         FarmAccess::ensureFlock($request->user(), $flock);
+        abort_if($flock->status === 'closed', 403, 'กรุณาให้ผู้ดูแลระบบปลดล็อกรุ่นก่อนแก้ไขข้อมูลลูกไก่');
 
         $request->validate([
-            'placements' => 'nullable|array',
-            'placements.*.*.placement_date' => 'nullable|date',
-            'placements.*.*.male_count' => 'nullable|integer|min:0',
-            'placements.*.*.female_count' => 'nullable|integer|min:0',
-            'placements.*.*.amount' => 'nullable|numeric|min:0',
+            'placements' => ['nullable', 'array'],
+            'placements.*' => ['nullable', 'array', 'max:100'],
+            'placements.*.*' => ['array'],
+            'placements.*.*.placement_date' => ['nullable', 'date'],
+            'placements.*.*.chicks_in' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'placements.*.*.male_count' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'placements.*.*.female_count' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'placements.*.*.amount' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
+            'placements.*.*.chick_source' => ['nullable', 'string', 'max:255'],
+            'placements.*.*.chick_grade' => ['nullable', Rule::in(['A', 'B', 'A,B'])],
+            'placements.*.*.chick_code' => ['nullable', 'string', 'max:2000'],
+            'placements.*.*.batch_no' => ['nullable', 'string', 'max:255'],
+            'placements.*.*.sex' => ['nullable', Rule::in(['ผู้', 'เมีย', 'คละ'])],
+            'placements.*.*.breed' => ['nullable', 'string', 'max:255'],
+            'placements.*.*.remarks' => ['nullable', 'string', 'max:255'],
         ]);
 
         DB::transaction(function () use ($flock, $request) {
@@ -147,7 +158,7 @@ class FlockPlacementController extends Controller
             foreach ($flock->flockHouseStarts as $start) {
                 $houseId = $start->house_id;
                 $rows = $placementsData[$houseId] ?? [];
-                
+                $earliestPlacementDate = null;
                 $totalHouseChicks = 0;
 
                 foreach ($rows as $row) {

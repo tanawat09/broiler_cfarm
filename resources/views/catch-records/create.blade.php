@@ -180,12 +180,6 @@
                 const tr = document.createElement('tr');
                 tr.className = 'catch-row hover:bg-slate-50/40';
 
-                // Render catching teams options dynamically
-                let teamOptions = '<option value="">เลือกทีมจับ</option>';
-                catchingTeams.forEach(team => {
-                    teamOptions += `<option value="${team.name}">${team.name}</option>`;
-                });
-
                 tr.innerHTML = `
                     <td class="px-2.5 py-2.5 text-center font-mono">
                         <input type="number" name="items[${rowIndex}][sequence]" value="${nextSequence}" class="w-full rounded-md border-gray-300 bg-slate-50 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-center py-1 row-sequence" readonly required>
@@ -221,9 +215,7 @@
                         </select>
                     </td>
                     <td class="px-2.5 py-2.5">
-                        <select name="items[${rowIndex}][catching_team]" class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500 py-1">
-                            ${teamOptions}
-                        </select>
+                        <select name="items[${rowIndex}][catching_team]" class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500 py-1 catching-team-select"></select>
                     </td>
                     <td class="px-2.5 py-2.5 text-right">
                         <input type="number" step="0.01" min="0" name="items[${rowIndex}][catching_fee]" value="1600" class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-right font-semibold py-1 fee-input" placeholder="0.00" required>
@@ -239,6 +231,13 @@
                         </button>
                     </td>
                 `;
+
+                const teamSelect = tr.querySelector('.catching-team-select');
+                teamSelect.add(new Option('เลือกทีมจับ', ''));
+                catchingTeams.forEach((team) => {
+                    const name = String(team.name ?? '');
+                    teamSelect.add(new Option(name, name));
+                });
 
                 tbody.appendChild(tr);
 

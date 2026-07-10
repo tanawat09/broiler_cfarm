@@ -123,6 +123,7 @@ class FlockController extends Controller
     public function edit(Flock $flock): View
     {
         FarmAccess::ensureFlock(request()->user(), $flock);
+        abort_if($flock->status === 'closed', 403, 'กรุณาให้ผู้ดูแลระบบปลดล็อกรุ่นก่อนแก้ไขข้อมูล');
 
         $flock->load('farm');
         $houses = $flock->farm->houses()->where('is_active', true)->orderBy('house_no')->get();
@@ -144,6 +145,7 @@ class FlockController extends Controller
     public function update(UpdateFlockRequest $request, Flock $flock): RedirectResponse
     {
         FarmAccess::ensureFlock($request->user(), $flock);
+        abort_if($flock->status === 'closed', 403, 'กรุณาให้ผู้ดูแลระบบปลดล็อกรุ่นก่อนแก้ไขข้อมูล');
 
         $validated = $request->validated();
         $flock->load('farm');

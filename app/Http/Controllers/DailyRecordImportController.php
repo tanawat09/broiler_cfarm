@@ -32,13 +32,14 @@ class DailyRecordImportController extends Controller
     {
         $request->validate([
             'flock_id' => ['required', 'exists:flocks,id'],
-            'file' => ['required', 'file', 'mimes:txt,csv'],
+            'file' => ['required', 'file', 'mimes:txt,csv', 'max:5120'],
         ], [
             'flock_id.required' => 'กรุณาเลือกรุ่นการเลี้ยง',
             'flock_id.exists' => 'รุ่นการเลี้ยงไม่ถูกต้อง',
             'file.required' => 'กรุณาเลือกไฟล์ที่ต้องการนำเข้า',
             'file.file' => 'ไฟล์ที่อัปโหลดไม่ถูกต้อง',
             'file.mimes' => 'รองรับเฉพาะไฟล์สกุล .txt หรือ .csv เท่านั้น',
+            'file.max' => 'ไฟล์นำเข้าต้องมีขนาดไม่เกิน 5 MB',
         ]);
 
         $flock = Flock::findOrFail($request->input('flock_id'));

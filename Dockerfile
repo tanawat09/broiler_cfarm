@@ -13,7 +13,7 @@ FROM composer:2 AS vendor
 WORKDIR /app
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --ignore-platform-reqs
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --ignore-platform-req=ext-gd
 COPY . .
 RUN composer dump-autoload --optimize
 
@@ -34,7 +34,10 @@ COPY docker/entrypoint.sh /usr/local/bin/broiler-entrypoint
 RUN rm -f bootstrap/cache/*.php \
     && chmod +x /usr/local/bin/broiler-entrypoint \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chown -R www-data:www-data /var/www/html \
     && chmod -R 775 storage bootstrap/cache
+
+USER www-data
 
 EXPOSE 8000
 

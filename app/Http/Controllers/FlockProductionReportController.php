@@ -22,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Mpdf\Mpdf;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -40,6 +41,7 @@ class FlockProductionReportController extends Controller
     public function updateAdjustments(Request $request, Flock $flock): RedirectResponse
     {
         FarmAccess::ensureFlock($request->user(), $flock);
+        abort_if($flock->status === 'closed', 403, 'กรุณาให้ผู้ดูแลระบบปลดล็อกรุ่นก่อนแก้ไขค่ารายงาน');
 
         $validated = $request->validate([
             'adjustments' => ['nullable', 'array'],
@@ -123,7 +125,7 @@ class FlockProductionReportController extends Controller
         ];
 
         $sheet->mergeCells('A1:V1');
-        $sheet->setCellValue('A1', $data['title']);
+        $sheet->setCellValueExplicit('A1', (string) $data['title'], DataType::TYPE_STRING);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
 
@@ -154,6 +156,18 @@ class FlockProductionReportController extends Controller
                 $row['problem_rate'],
                 $row['premium_base'],
             ], null, 'A'.$rowNumber);
+
+            foreach ([
+                'B' => $row['placement_date_text'],
+                'C' => $row['catch_date_text'],
+                'E' => $row['sex'],
+                'F' => $row['grade'],
+                'G' => $row['breed'],
+                'H' => $row['chick_source'],
+            ] as $column => $value) {
+                $sheet->setCellValueExplicit($column.$rowNumber, (string) ($value ?? ''), DataType::TYPE_STRING);
+            }
+
             $rowNumber++;
         }
 
@@ -182,6 +196,8 @@ class FlockProductionReportController extends Controller
         $financeStart++;
         foreach ($data['financeRows'] as $financeRow) {
             $sheet->fromArray([$financeRow['label'], $financeRow['amount'], $financeRow['per_bird'], $financeRow['note']], null, 'A'.$financeStart);
+            $sheet->setCellValueExplicit('A'.$financeStart, (string) $financeRow['label'], DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('D'.$financeStart, (string) ($financeRow['note'] ?? ''), DataType::TYPE_STRING);
             $financeStart++;
         }
 

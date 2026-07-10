@@ -15,7 +15,21 @@
 
 ## รันด้วย Rancher Desktop + Docker Compose
 
-เปิด Rancher Desktop ให้พร้อมใช้งาน แล้วรัน:
+เปิด Rancher Desktop ให้พร้อมใช้งาน คัดลอก `.env.example` เป็น `.env` แล้วกำหนดค่าที่ห้ามเว้นว่าง:
+
+```text
+APP_KEY=base64:คีย์สุ่มขนาด32ไบต์
+DOCKER_DB_PASSWORD=รหัสผ่านฐานข้อมูลที่คาดเดายาก
+DOCKER_DB_ROOT_PASSWORD=รหัสผ่าน root ที่แตกต่างจากรหัสผ่านด้านบน
+```
+
+สร้าง `APP_KEY` ได้ด้วยคำสั่งต่อไปนี้ แล้วคัดลอกผลลัพธ์ลง `.env`:
+
+```powershell
+docker run --rm php:8.3-cli-alpine php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
+```
+
+จากนั้นรัน:
 
 ```powershell
 docker compose up -d --build
@@ -27,25 +41,28 @@ docker compose up -d --build
 http://localhost:8000
 ```
 
-บัญชีหลัก:
+พอร์ตของแอปและฐานข้อมูลจะ bind เฉพาะ `127.0.0.1` โดยค่าเริ่มต้น จึงไม่เปิดให้เครื่องอื่นในเครือข่ายเข้าถึง
+
+### สร้างข้อมูลตัวอย่างครั้งแรก
+
+ระบบจะไม่สร้างบัญชีตัวอย่างอัตโนมัติ หากต้องการใช้ข้อมูลตัวอย่างบนเครื่อง local ให้กำหนดค่าต่อไปนี้ใน `.env` ก่อนเปิด container ครั้งแรก:
 
 ```text
-admin@example.com
-password
+AUTO_SEED_DEMO_DATA=true
+DEMO_USER_PASSWORD=รหัสผ่านทดสอบที่ยาวอย่างน้อย12ตัวอักษร
 ```
+
+หลังสร้างข้อมูลแล้วให้เปลี่ยน `AUTO_SEED_DEMO_DATA=false` บัญชีตัวอย่างทั้งหมดจะใช้รหัสผ่านจาก `DEMO_USER_PASSWORD`
 
 หมายเหตุ: ฐานข้อมูลเก็บอยู่ใน Docker volume `broiler-db-data` ข้อมูลจะไม่หายเมื่อ `docker compose up -d --build` หรือ rebuild app container ตราบใดที่ไม่ลบ volume
 
+หากเป็นฐานข้อมูลเดิม การเปลี่ยนค่าใน `.env` เพียงอย่างเดียวจะไม่เปลี่ยนรหัสผ่านที่ MariaDB บันทึกไว้ ต้องหมุนรหัสผ่านผู้ใช้ฐานข้อมูลใน MariaDB ก่อน แล้วจึงแก้ `.env` ให้ตรงกัน
+
 ## บัญชีทดสอบ
 
-- Super Admin: `admin@example.com` / `password`
-- หนองถนน: `nongthanon@example.com` / `password`
-- ก้านเหลือง: `kanlueang@example.com` / `password`
-- หนองบอน: `nongbon@example.com` / `password`
-- โคกสนวน: `khoksanuan@example.com` / `password`
-- บ้านบาตร: `banbat@example.com` / `password`
-- ศรีสุข: `srisuk@example.com` / `password`
-- นรินทร์: `narin@example.com` / `password`
+- Super Admin: `admin@example.com`
+- Farm Manager: `nongthanon@example.com`, `kanlueang@example.com`, `nongbon@example.com`, `khoksanuan@example.com`, `banbat@example.com`, `srisuk@example.com`, `narin@example.com`
+- รหัสผ่านมาจากค่า `DEMO_USER_PASSWORD` และไม่ควรใช้บัญชีเหล่านี้ใน production
 
 ## ฟาร์มเริ่มต้น
 
@@ -132,4 +149,4 @@ docker exec broiler-app php artisan migrate:status
 - Line notification
 - ข้อมูลโรงเชือด
 - ข้อมูลลูกค้า
-- ระบบปิดรุ่นยังไม่ล็อกการแก้ไขย้อนหลัง ตาม requirement ปัจจุบัน
+- เมื่อปิดรุ่น ระบบจะล็อกการแก้ไขข้อมูลย้อนหลัง และต้องให้ Super Admin ปลดล็อกก่อนแก้ไข

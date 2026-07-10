@@ -5,12 +5,14 @@
                 <h1 class="text-xl font-semibold text-gray-900">แหล่งลูกไก่</h1>
                 <p class="mt-1 text-sm text-gray-600">จัดการรายการแหล่งลูกไก่สำหรับใช้ในหน้าเปิดรุ่น</p>
             </div>
-            <a href="{{ route('chick-sources.create') }}" class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 transition-all duration-200 transform hover:-translate-y-0.5">
-                <svg class="h-4 w-4 text-white/80 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                เพิ่มแหล่งลูกไก่
-            </a>
+            @if (auth()->user()->isSuperAdmin())
+                <a href="{{ route('chick-sources.create') }}" class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-700 transition-all duration-200 transform hover:-translate-y-0.5">
+                    <svg class="h-4 w-4 text-white/80 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    เพิ่มแหล่งลูกไก่
+                </a>
+            @endif
         </div>
     </x-slot>
 
@@ -42,14 +44,18 @@
                                         </span>
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3 text-right">
-                                        <div class="flex justify-end gap-3">
-                                            <a href="{{ route('chick-sources.edit', $source) }}" class="text-sm font-medium text-indigo-700 hover:text-indigo-900">แก้ไข</a>
-                                            <form method="POST" action="{{ route('chick-sources.destroy', $source) }}" onsubmit="return confirm('ยืนยันลบแหล่งลูกไก่นี้หรือไม่?')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="text-sm font-medium text-red-700 hover:text-red-900">ลบ</button>
-                                            </form>
-                                        </div>
+                                        @if (auth()->user()->isSuperAdmin())
+                                            <div class="flex justify-end gap-3">
+                                                <a href="{{ route('chick-sources.edit', $source) }}" class="text-sm font-medium text-indigo-700 hover:text-indigo-900">แก้ไข</a>
+                                                <form method="POST" action="{{ route('chick-sources.destroy', $source) }}" onsubmit="return confirm('ยืนยันลบแหล่งลูกไก่นี้หรือไม่?')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-sm font-medium text-red-700 hover:text-red-900">ลบ</button>
+                                                </form>
+                                            </div>
+                                        @else
+                                            <span class="text-xs text-gray-400">ดูอย่างเดียว</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

@@ -10,7 +10,7 @@ class UpdateChickSourceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->isSuperAdmin() ?? false;
     }
 
     public function rules(): array

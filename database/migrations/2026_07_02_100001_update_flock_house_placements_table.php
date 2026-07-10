@@ -8,7 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        }
 
         Schema::table('flock_house_placements', function (Blueprint $table) {
             // Drop unique constraint
@@ -22,12 +24,16 @@ return new class extends Migration
             $table->string('remarks')->nullable();
         });
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        }
     }
 
     public function down(): void
     {
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        }
 
         Schema::table('flock_house_placements', function (Blueprint $table) {
             $table->unique(['flock_id', 'house_id']);
@@ -36,6 +42,8 @@ return new class extends Migration
             $table->dropColumn('remarks');
         });
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        }
     }
 };

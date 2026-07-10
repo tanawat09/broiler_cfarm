@@ -25,12 +25,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::transaction(function (): void {
+        $demoPassword = (string) env('DEMO_USER_PASSWORD', '');
+
+        if (mb_strlen($demoPassword) < 12) {
+            throw new \RuntimeException('DEMO_USER_PASSWORD must contain at least 12 characters before demo data can be seeded.');
+        }
+
+        if (app()->environment('production') && ! filter_var(env('ALLOW_DEMO_SEEDING', false), FILTER_VALIDATE_BOOLEAN)) {
+            throw new \RuntimeException('Demo seeding is disabled in production. Set ALLOW_DEMO_SEEDING=true only for an isolated demo environment.');
+        }
+
+        DB::transaction(function () use ($demoPassword): void {
             $admin = User::query()->firstOrCreate(
                 ['email' => 'admin@example.com'],
                 [
                     'name' => 'Admin',
-                    'password' => Hash::make('password'),
+                    'password' => Hash::make($demoPassword),
                 ],
             );
             $admin->forceFill([
@@ -86,7 +96,7 @@ class DatabaseSeeder extends Seeder
                 ['name' => 'นรินทร์', 'code' => 'FARM-007', 'houses' => 20, 'email' => 'narin@example.com'],
             ];
 
-            $farmsByName = collect($farmDefinitions)->mapWithKeys(function (array $definition): array {
+            $farmsByName = collect($farmDefinitions)->mapWithKeys(function (array $definition) use ($demoPassword): array {
                 $farm = Farm::query()
                     ->where('farm_name', $definition['name'])
                     ->orWhere('farm_name', 'ฟาร์ม'.$definition['name'])
@@ -111,7 +121,7 @@ class DatabaseSeeder extends Seeder
                     ['email' => $definition['email']],
                     [
                         'name' => 'ผู้จัดการฟาร์ม '.$definition['name'],
-                        'password' => Hash::make('password'),
+                        'password' => Hash::make($demoPassword),
                     ],
                 );
                 $manager->forceFill([

@@ -5,24 +5,28 @@ services:
       dockerfile: Dockerfile
     container_name: broiler-app
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     environment:
       APP_NAME: Broiler
-      APP_ENV: local
-      APP_DEBUG: "true"
-      APP_URL: http://localhost:8000
+      APP_ENV: "${APP_ENV:-local}"
+      APP_KEY: "${APP_KEY:?Set APP_KEY in .env before starting the containers}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
       APP_LOCALE: th
       APP_FALLBACK_LOCALE: th
       DB_CONNECTION: mysql
       DB_HOST: db
       DB_PORT: 3306
-      DB_DATABASE: broiler
-      DB_USERNAME: broiler
-      DB_PASSWORD: broiler_password
+      DB_DATABASE: "${DOCKER_DB_DATABASE:-broiler}"
+      DB_USERNAME: "${DOCKER_DB_USERNAME:-broiler}"
+      DB_PASSWORD: "${DOCKER_DB_PASSWORD:?Set DOCKER_DB_PASSWORD in .env}"
       SESSION_DRIVER: database
       CACHE_STORE: database
       QUEUE_CONNECTION: database
       MAIL_MAILER: log
+      AUTO_SEED_DEMO_DATA: "${AUTO_SEED_DEMO_DATA:-false}"
+      DEMO_USER_PASSWORD: "${DEMO_USER_PASSWORD:-}"
+      ALLOW_DEMO_SEEDING: "${ALLOW_DEMO_SEEDING:-false}"
     depends_on:
       db:
         condition: service_healthy
@@ -32,12 +36,12 @@ services:
     container_name: broiler-db
     restart: unless-stopped
     ports:
-      - "3319:3306"
+      - "127.0.0.1:${DB_FORWARD_PORT:-3319}:3306"
     environment:
-      MARIADB_DATABASE: broiler
-      MARIADB_USER: broiler
-      MARIADB_PASSWORD: broiler_password
-      MARIADB_ROOT_PASSWORD: root_password
+      MARIADB_DATABASE: "${DOCKER_DB_DATABASE:-broiler}"
+      MARIADB_USER: "${DOCKER_DB_USERNAME:-broiler}"
+      MARIADB_PASSWORD: "${DOCKER_DB_PASSWORD:?Set DOCKER_DB_PASSWORD in .env}"
+      MARIADB_ROOT_PASSWORD: "${DOCKER_DB_ROOT_PASSWORD:?Set DOCKER_DB_ROOT_PASSWORD in .env}"
     volumes:
       - broiler-db-data:/var/lib/mysql
     healthcheck:

@@ -5,31 +5,56 @@ if [ ! -f .env ]; then
     cp .env.example .env
 fi
 
-set_env_value() {
-    local key="$1"
-    local value="$2"
+php <<'PHP'
+<?php
 
-    if grep -q "^${key}=" .env; then
-        sed -i "s|^${key}=.*|${key}=${value}|" .env
-    else
-        printf '\n%s=%s\n' "$key" "$value" >> .env
-    fi
+$keys = [
+    'APP_NAME',
+    'APP_ENV',
+    'APP_KEY',
+    'APP_DEBUG',
+    'APP_URL',
+    'APP_LOCALE',
+    'APP_FALLBACK_LOCALE',
+    'DB_CONNECTION',
+    'DB_HOST',
+    'DB_PORT',
+    'DB_DATABASE',
+    'DB_USERNAME',
+    'DB_PASSWORD',
+    'SESSION_DRIVER',
+    'CACHE_STORE',
+    'QUEUE_CONNECTION',
+    'MAIL_MAILER',
+    'AUTO_SEED_DEMO_DATA',
+    'DEMO_USER_PASSWORD',
+    'ALLOW_DEMO_SEEDING',
+];
+
+$path = '.env';
+$contents = file_exists($path) ? file_get_contents($path) : '';
+
+foreach ($keys as $key) {
+    $value = getenv($key);
+
+    if ($value === false) {
+        continue;
+    }
+
+    $escaped = '"' . str_replace(["\\", "\"", "\n", "\r"], ["\\\\", "\\\"", "\\n", ""], $value) . '"';
+    $line = $key . '=' . $escaped;
+
+    if (preg_match('/^' . preg_quote($key, '/') . '=/m', $contents)) {
+        $contents = preg_replace('/^' . preg_quote($key, '/') . '=.*/m', $line, $contents);
+    } else {
+        $contents = rtrim($contents) . PHP_EOL . $line . PHP_EOL;
+    }
 }
 
-set_env_value APP_ENV "${APP_ENV:-local}"
-set_env_value APP_DEBUG "${APP_DEBUG:-true}"
-set_env_value APP_URL "${APP_URL:-http://localhost:8000}"
-set_env_value DB_CONNECTION "${DB_CONNECTION:-mysql}"
-set_env_value DB_HOST "${DB_HOST:-db}"
-set_env_value DB_PORT "${DB_PORT:-3306}"
-set_env_value DB_DATABASE "${DB_DATABASE:-broiler}"
-set_env_value DB_USERNAME "${DB_USERNAME:-broiler}"
-set_env_value DB_PASSWORD "${DB_PASSWORD:-broiler_password}"
-set_env_value SESSION_DRIVER "${SESSION_DRIVER:-database}"
-set_env_value CACHE_STORE "${CACHE_STORE:-database}"
-set_env_value QUEUE_CONNECTION "${QUEUE_CONNECTION:-database}"
+file_put_contents($path, $contents);
+PHP
 
-if ! grep -q '^APP_KEY=base64:' .env; then
+if [ -z "${APP_KEY:-}" ] && ! grep -q '^APP_KEY=base64:' .env; then
     php artisan key:generate --force --no-interaction
 fi
 
@@ -44,8 +69,10 @@ USER_COUNT="$(mysql -h"${DB_HOST}" -P"${DB_PORT}" -u"${DB_USERNAME}" -p"${DB_PAS
 
 if [ "${USER_COUNT}" != "0" ]; then
     echo "Database already has users; skipping seed."
-else
+elif [ "${AUTO_SEED_DEMO_DATA:-false}" = "true" ]; then
     php artisan db:seed --force --no-interaction
+else
+    echo "Database has no users; demo seeding is disabled. Set AUTO_SEED_DEMO_DATA=true and DEMO_USER_PASSWORD to opt in."
 fi
 
 exec "$@"

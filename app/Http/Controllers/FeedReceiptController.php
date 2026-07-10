@@ -198,6 +198,7 @@ class FeedReceiptController extends Controller
         if ($hasFlockColumn && ! empty($validated['flock_id'])) {
             $flock = Flock::query()->findOrFail($validated['flock_id']);
             FarmAccess::ensureFlock($request->user(), $flock);
+            abort_if($flock->status === 'closed', 403, 'กรุณาให้ผู้ดูแลระบบปลดล็อกรุ่นก่อนบันทึกรับอาหาร');
 
             if ((int) $flock->farm_id !== (int) $farm->id) {
                 throw ValidationException::withMessages([

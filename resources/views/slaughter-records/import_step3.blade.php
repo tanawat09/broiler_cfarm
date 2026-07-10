@@ -26,7 +26,7 @@
 
             <form method="POST" action="{{ route('flocks.slaughter-records.handle-import', $flock) }}">
                 @csrf
-                <input type="hidden" name="temp_path" value="{{ $tempPath }}">
+                <input type="hidden" name="upload_token" value="{{ $uploadToken }}">
 
                 <div class="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex items-center justify-between">
                     <div>

@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreChickSourceRequest;
 use App\Http\Requests\UpdateChickSourceRequest;
 use App\Models\ChickSource;
+use App\Support\FarmAccess;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ChickSourceController extends Controller
@@ -20,8 +22,10 @@ class ChickSourceController extends Controller
         return view('chick-sources.index', compact('chickSources'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         return view('chick-sources.create', [
             'chickSource' => new ChickSource(['is_active' => true]),
         ]);
@@ -29,6 +33,8 @@ class ChickSourceController extends Controller
 
     public function store(StoreChickSourceRequest $request): RedirectResponse
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         ChickSource::query()->create([
             'name' => $request->validated('name'),
             'is_active' => $request->boolean('is_active'),
@@ -39,13 +45,17 @@ class ChickSourceController extends Controller
             ->with('status', 'เพิ่มแหล่งลูกไก่เรียบร้อยแล้ว');
     }
 
-    public function edit(ChickSource $chickSource): View
+    public function edit(Request $request, ChickSource $chickSource): View
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         return view('chick-sources.edit', compact('chickSource'));
     }
 
     public function update(UpdateChickSourceRequest $request, ChickSource $chickSource): RedirectResponse
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         $chickSource->update([
             'name' => $request->validated('name'),
             'is_active' => $request->boolean('is_active'),
@@ -56,8 +66,10 @@ class ChickSourceController extends Controller
             ->with('status', 'แก้ไขแหล่งลูกไก่เรียบร้อยแล้ว');
     }
 
-    public function destroy(ChickSource $chickSource): RedirectResponse
+    public function destroy(Request $request, ChickSource $chickSource): RedirectResponse
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         $chickSource->delete();
 
         return redirect()

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CatchingTeam;
+use App\Support\FarmAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -19,8 +20,10 @@ class CatchingTeamController extends Controller
         return view('catching-teams.index', compact('catchingTeams'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         return view('catching-teams.create', [
             'catchingTeam' => new CatchingTeam(['is_active' => true]),
         ]);
@@ -28,6 +31,8 @@ class CatchingTeamController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         $validated = $request->validate([
             'name' => 'required|string|max:100|unique:catching_teams,name',
             'is_active' => 'boolean',
@@ -43,13 +48,17 @@ class CatchingTeamController extends Controller
             ->with('status', 'เพิ่มทีมจับไก่เรียบร้อยแล้ว');
     }
 
-    public function edit(CatchingTeam $catchingTeam): View
+    public function edit(Request $request, CatchingTeam $catchingTeam): View
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         return view('catching-teams.edit', compact('catchingTeam'));
     }
 
     public function update(Request $request, CatchingTeam $catchingTeam): RedirectResponse
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         $validated = $request->validate([
             'name' => 'required|string|max:100|unique:catching_teams,name,' . $catchingTeam->id,
             'is_active' => 'boolean',
@@ -65,8 +74,10 @@ class CatchingTeamController extends Controller
             ->with('status', 'แก้ไขทีมจับไก่เรียบร้อยแล้ว');
     }
 
-    public function destroy(CatchingTeam $catchingTeam): RedirectResponse
+    public function destroy(Request $request, CatchingTeam $catchingTeam): RedirectResponse
     {
+        FarmAccess::ensureSuperAdmin($request->user());
+
         $catchingTeam->delete();
 
         return redirect()

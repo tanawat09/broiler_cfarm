@@ -9,13 +9,19 @@ use App\Models\FlockSlaughterRecord;
 use App\Support\FarmAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class FlockSlaughterRecordController extends Controller
 {
+    private const MAX_IMPORT_ROWS = 10000;
+
+    private const TEMP_IMPORT_TTL_SECONDS = 7200;
+
     public function index(Request $request, Flock $flock): View
     {
         $user = $request->user();
@@ -90,28 +96,45 @@ class FlockSlaughterRecordController extends Controller
         abort_if($flock->status === 'closed', 403, 'รุ่นการเลี้ยงนี้ถูกปิดไปแล้ว ไม่สามารถนำเข้าข้อมูลได้');
 
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls',
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
         ], [
             'file.required' => 'กรุณาเลือกไฟล์ Excel ที่ต้องการอัปโหลด',
             'file.mimes' => 'รองรับเฉพาะไฟล์ Excel (.xlsx, .xls) เท่านั้น',
+            'file.max' => 'ไฟล์ Excel ต้องมีขนาดไม่เกิน 10 MB',
         ]);
 
         $file = $request->file('file');
-        // Store temporarily
-        $path = $file->store('temp');
+        $uploadToken = (string) Str::uuid();
+        $path = $file->store('temp/'.$request->user()->id.'/'.$flock->id);
+
+        if (! $path) {
+            return back()->withErrors(['file' => 'ไม่สามารถจัดเก็บไฟล์ชั่วคราวได้ กรุณาลองใหม่อีกครั้ง']);
+        }
 
         try {
             $realPath = Storage::path($path);
-            $spreadsheet = IOFactory::load($realPath);
+            $reader = IOFactory::createReaderForFile($realPath);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($realPath);
             $sheetNames = $spreadsheet->getSheetNames();
-        } catch (\Exception $e) {
+            $spreadsheet->disconnectWorksheets();
+        } catch (\Throwable $e) {
             Storage::delete($path);
-            return back()->withErrors(['file' => 'ไม่สามารถอ่านไฟล์ Excel นี้ได้: ' . $e->getMessage()]);
+            report($e);
+
+            return back()->withErrors(['file' => 'ไม่สามารถอ่านไฟล์ Excel นี้ได้ กรุณาตรวจสอบรูปแบบไฟล์แล้วลองใหม่']);
         }
+
+        $request->session()->put($this->importSessionKey($uploadToken), [
+            'path' => $path,
+            'user_id' => (int) $request->user()->id,
+            'flock_id' => (int) $flock->id,
+            'created_at' => time(),
+        ]);
 
         return view('slaughter-records.import_step2', compact(
             'flock',
-            'path',
+            'uploadToken',
             'sheetNames'
         ));
     }
@@ -122,32 +145,37 @@ class FlockSlaughterRecordController extends Controller
         abort_if($flock->status === 'closed', 403, 'รุ่นการเลี้ยงนี้ถูกปิดไปแล้ว');
 
         $validated = $request->validate([
-            'temp_path' => 'required|string',
-            'sheet_name' => 'required|string',
-            'start_row' => 'required|integer|min:1',
-            'col_house' => 'required|string|max:3',
-            'col_birds' => 'required|string|max:3',
-            'col_weight' => 'required|string|max:3',
-            'col_doa' => 'required|string|max:3',
-            'col_net' => 'required|string|max:3',
-            'col_condemned' => 'required|string|max:3',
-            'col_condemned_percent' => 'required|string|max:3',
-            'col_problem' => 'required|string|max:3',
-            'col_problem_percent' => 'required|string|max:3',
-            'col_dead_weight' => 'required|string|max:3',
+            'upload_token' => ['required', 'uuid'],
+            'sheet_name' => ['required', 'string', 'max:255'],
+            'start_row' => ['required', 'integer', 'min:1', 'max:'.self::MAX_IMPORT_ROWS],
+            'col_house' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_birds' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_weight' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_doa' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_net' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_condemned' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_condemned_percent' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_problem' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_problem_percent' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
+            'col_dead_weight' => ['required', 'regex:/^[A-Za-z]{1,3}$/'],
         ]);
 
-        $tempPath = $validated['temp_path'];
-        $realPath = Storage::path($tempPath);
+        $uploadToken = $validated['upload_token'];
+        $tempPath = $this->validatedImportPath($request, $flock, $uploadToken);
 
-        if (!Storage::exists($tempPath)) {
+        if ($tempPath === null) {
             return redirect()
                 ->route('flocks.slaughter-records.upload', $flock)
                 ->withErrors(['file' => 'ไฟล์ชั่วคราวหมดอายุหรือถูกลบแล้ว กรุณาอัปโหลดใหม่อีกครั้ง']);
         }
 
+        $realPath = Storage::path($tempPath);
+        $spreadsheet = null;
+
         try {
-            $spreadsheet = IOFactory::load($realPath);
+            $reader = IOFactory::createReaderForFile($realPath);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($realPath);
             $sheet = $spreadsheet->getSheetByName($validated['sheet_name']);
             if (!$sheet) {
                 return redirect()
@@ -158,6 +186,25 @@ class FlockSlaughterRecordController extends Controller
             $highestRow = $sheet->getHighestRow();
             $startRow = (int) $validated['start_row'];
 
+            if ($highestRow > self::MAX_IMPORT_ROWS) {
+                return redirect()
+                    ->route('flocks.slaughter-records.upload', $flock)
+                    ->withErrors(['file' => 'ไฟล์มีข้อมูลเกิน '.number_format(self::MAX_IMPORT_ROWS).' แถว กรุณาแบ่งไฟล์แล้วนำเข้าใหม่']);
+            }
+
+            $columns = collect([
+                'house' => $validated['col_house'],
+                'birds' => $validated['col_birds'],
+                'weight' => $validated['col_weight'],
+                'doa' => $validated['col_doa'],
+                'net' => $validated['col_net'],
+                'condemned' => $validated['col_condemned'],
+                'condemned_percent' => $validated['col_condemned_percent'],
+                'problem' => $validated['col_problem'],
+                'problem_percent' => $validated['col_problem_percent'],
+                'dead_weight' => $validated['col_dead_weight'],
+            ])->map(fn (string $column) => strtoupper($column));
+
             $parsedRows = [];
             $flock->load('flockHouseStarts.house');
             $availableHouses = $flock->flockHouseStarts->map(fn($s) => $s->house)->sortBy('house_no');
@@ -167,22 +214,22 @@ class FlockSlaughterRecordController extends Controller
 
             for ($row = $startRow; $row <= $highestRow; $row++) {
                 // Get values
-                $rawHouse = trim((string)$sheet->getCell($validated['col_house'] . $row)->getValue());
+                $rawHouse = trim((string) $sheet->getCell($columns['house'].$row)->getValue());
                 
                 // If rawHouse is empty, skip this row (usually blank row at the bottom)
                 if (empty($rawHouse)) {
                     continue;
                 }
 
-                $birds = (int) $sheet->getCell($validated['col_birds'] . $row)->getValue();
-                $weight = (float) $sheet->getCell($validated['col_weight'] . $row)->getValue();
-                $doa = (int) $sheet->getCell($validated['col_doa'] . $row)->getValue();
-                $net = (int) $sheet->getCell($validated['col_net'] . $row)->getValue();
-                $condemned = (int) $sheet->getCell($validated['col_condemned'] . $row)->getValue();
-                $condemned_percent = (float) $sheet->getCell($validated['col_condemned_percent'] . $row)->getValue();
-                $problem = (int) $sheet->getCell($validated['col_problem'] . $row)->getValue();
-                $problem_percent = (float) $sheet->getCell($validated['col_problem_percent'] . $row)->getValue();
-                $dead_weight = (float) $sheet->getCell($validated['col_dead_weight'] . $row)->getValue();
+                $birds = (int) $sheet->getCell($columns['birds'].$row)->getValue();
+                $weight = (float) $sheet->getCell($columns['weight'].$row)->getValue();
+                $doa = (int) $sheet->getCell($columns['doa'].$row)->getValue();
+                $net = (int) $sheet->getCell($columns['net'].$row)->getValue();
+                $condemned = (int) $sheet->getCell($columns['condemned'].$row)->getValue();
+                $condemned_percent = (float) $sheet->getCell($columns['condemned_percent'].$row)->getValue();
+                $problem = (int) $sheet->getCell($columns['problem'].$row)->getValue();
+                $problem_percent = (float) $sheet->getCell($columns['problem_percent'].$row)->getValue();
+                $dead_weight = (float) $sheet->getCell($columns['dead_weight'].$row)->getValue();
 
                 // Simple house matcher logic: e.g. "เล้า 1" -> 1, "1001" -> 1, "1012" -> 12
                 $matchedHouseId = null;
@@ -231,15 +278,19 @@ class FlockSlaughterRecordController extends Controller
                     ->withErrors(['file' => 'ไม่พบข้อมูลใน Sheet หรือช่วงแถวที่เลือก กรุณาอัปโหลดและตรวจสอบแถวเริ่มต้นใหม่อีกครั้ง']);
             }
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return redirect()
                 ->route('flocks.slaughter-records.upload', $flock)
-                ->withErrors(['file' => 'เกิดข้อผิดพลาดในการดึงข้อมูลจาก Excel: ' . $e->getMessage()]);
+                ->withErrors(['file' => 'เกิดข้อผิดพลาดในการอ่านข้อมูลจาก Excel กรุณาตรวจสอบไฟล์แล้วลองใหม่']);
+        } finally {
+            $spreadsheet?->disconnectWorksheets();
         }
 
         return view('slaughter-records.import_step3', compact(
             'flock',
-            'tempPath',
+            'uploadToken',
             'parsedRows',
             'availableHouses'
         ));
@@ -261,20 +312,20 @@ class FlockSlaughterRecordController extends Controller
         abort_if($flock->status === 'closed', 403, 'รุ่นการเลี้ยงนี้ถูกปิดไปแล้ว');
 
         $validator = Validator::make($request->all(), [
-            'temp_path' => 'required|string',
-            'records' => 'required|array|min:1',
+            'upload_token' => ['required', 'uuid'],
+            'records' => ['required', 'array', 'min:1', 'max:'.self::MAX_IMPORT_ROWS],
             'records.*.house_id' => 'required|exists:houses,id',
-            'records.*.sequence' => 'required|integer|min:1',
-            'records.*.raw_house_name' => 'nullable|string',
-            'records.*.slaughter_birds' => 'required|integer|min:0',
-            'records.*.actual_weight' => 'required|numeric|min:0',
-            'records.*.doa_birds' => 'required|integer|min:0',
-            'records.*.net_birds' => 'required|integer|min:0',
-            'records.*.condemned_birds' => 'required|integer|min:0',
-            'records.*.condemned_percent' => 'required|numeric|min:0',
-            'records.*.problem_birds' => 'required|integer|min:0',
-            'records.*.problem_percent' => 'required|numeric|min:0',
-            'records.*.dead_weight' => 'required|numeric|min:0',
+            'records.*.sequence' => 'required|integer|min:1|max:1000000',
+            'records.*.raw_house_name' => 'nullable|string|max:255',
+            'records.*.slaughter_birds' => 'required|integer|min:0|max:10000000',
+            'records.*.actual_weight' => 'required|numeric|min:0|max:1000000000',
+            'records.*.doa_birds' => 'required|integer|min:0|max:10000000',
+            'records.*.net_birds' => 'required|integer|min:0|max:10000000',
+            'records.*.condemned_birds' => 'required|integer|min:0|max:10000000',
+            'records.*.condemned_percent' => 'required|numeric|min:0|max:100',
+            'records.*.problem_birds' => 'required|integer|min:0|max:10000000',
+            'records.*.problem_percent' => 'required|numeric|min:0|max:100',
+            'records.*.dead_weight' => 'required|numeric|min:0|max:1000000000',
         ], [
             'records.*.house_id.required' => 'กรุณาจับคู่เล้าในระบบให้ครบทุกแถวก่อนบันทึก',
             'records.*.house_id.exists' => 'พบเล้าที่เลือกไม่ถูกต้อง กรุณาตรวจสอบการจับคู่เล้าอีกครั้ง',
@@ -306,40 +357,48 @@ class FlockSlaughterRecordController extends Controller
         }
 
         $validated = $validator->validated();
+        $uploadToken = $validated['upload_token'];
+        $tempPath = $this->validatedImportPath($request, $flock, $uploadToken);
 
-        // Save records
-        foreach ($validated['records'] as $record) {
-            $catchRecord = $this->catchRecordForImportRow(
-                $flock,
-                (int) $record['house_id'],
-                (int) $record['sequence']
-            );
-
-            FlockSlaughterRecord::create([
-                'farm_id' => $flock->farm_id,
-                'flock_id' => $flock->id,
-                'house_id' => $record['house_id'],
-                'slaughter_date' => $catchRecord->catch_date->toDateString(),
-                'sequence' => $record['sequence'],
-                'raw_house_name' => $record['raw_house_name'] ?? null,
-                'slaughter_birds' => $record['slaughter_birds'],
-                'actual_weight' => $record['actual_weight'],
-                'doa_birds' => $record['doa_birds'],
-                'net_birds' => $record['net_birds'],
-                'condemned_birds' => $record['condemned_birds'],
-                'condemned_percent' => $record['condemned_percent'],
-                'problem_birds' => $record['problem_birds'],
-                'problem_percent' => $record['problem_percent'],
-                'dead_weight' => $record['dead_weight'],
-                'created_by' => $user->id,
-                'updated_by' => $user->id,
-            ]);
+        if ($tempPath === null) {
+            return redirect()
+                ->route('flocks.slaughter-records.upload', $flock)
+                ->withErrors(['file' => 'ไฟล์ชั่วคราวหมดอายุหรือไม่ใช่ไฟล์ของผู้ใช้ กรุณาอัปโหลดใหม่อีกครั้ง']);
         }
+
+        DB::transaction(function () use ($validated, $flock, $user): void {
+            foreach ($validated['records'] as $record) {
+                $catchRecord = $this->catchRecordForImportRow(
+                    $flock,
+                    (int) $record['house_id'],
+                    (int) $record['sequence']
+                );
+
+                FlockSlaughterRecord::create([
+                    'farm_id' => $flock->farm_id,
+                    'flock_id' => $flock->id,
+                    'house_id' => $record['house_id'],
+                    'slaughter_date' => $catchRecord->catch_date->toDateString(),
+                    'sequence' => $record['sequence'],
+                    'raw_house_name' => $record['raw_house_name'] ?? null,
+                    'slaughter_birds' => $record['slaughter_birds'],
+                    'actual_weight' => $record['actual_weight'],
+                    'doa_birds' => $record['doa_birds'],
+                    'net_birds' => $record['net_birds'],
+                    'condemned_birds' => $record['condemned_birds'],
+                    'condemned_percent' => $record['condemned_percent'],
+                    'problem_birds' => $record['problem_birds'],
+                    'problem_percent' => $record['problem_percent'],
+                    'dead_weight' => $record['dead_weight'],
+                    'created_by' => $user->id,
+                    'updated_by' => $user->id,
+                ]);
+            }
+        });
 
         // Clean up temporary file
-        if (Storage::exists($validated['temp_path'])) {
-            Storage::delete($validated['temp_path']);
-        }
+        Storage::delete($tempPath);
+        $request->session()->forget($this->importSessionKey($uploadToken));
 
         return redirect()
             ->route('flocks.slaughter-records.index', $flock)
@@ -356,7 +415,7 @@ class FlockSlaughterRecordController extends Controller
             ->sortBy('house_no')
             ->values();
 
-        $tempPath = (string) $request->input('temp_path', '');
+        $uploadToken = (string) $request->input('upload_token', '');
         $parsedRows = collect($request->input('records', []))
             ->map(function ($record, $index) use ($flock) {
                 $catchRecord = (!empty($record['house_id']) && !empty($record['sequence']))
@@ -384,7 +443,7 @@ class FlockSlaughterRecordController extends Controller
 
         return view('slaughter-records.import_step3', compact(
             'flock',
-            'tempPath',
+            'uploadToken',
             'parsedRows',
             'availableHouses'
         ))->withErrors($errors);
@@ -397,6 +456,43 @@ class FlockSlaughterRecordController extends Controller
             ->where('house_id', $houseId)
             ->where('sequence', $sequence)
             ->first();
+    }
+
+    private function validatedImportPath(Request $request, Flock $flock, string $uploadToken): ?string
+    {
+        if (! Str::isUuid($uploadToken)) {
+            return null;
+        }
+
+        $sessionKey = $this->importSessionKey($uploadToken);
+        $metadata = $request->session()->get($sessionKey);
+
+        if (! is_array($metadata)
+            || (int) ($metadata['user_id'] ?? 0) !== (int) $request->user()->id
+            || (int) ($metadata['flock_id'] ?? 0) !== (int) $flock->id) {
+            return null;
+        }
+
+        $path = (string) ($metadata['path'] ?? '');
+        $expectedPrefix = 'temp/'.$request->user()->id.'/'.$flock->id.'/';
+
+        if (! str_starts_with($path, $expectedPrefix)) {
+            return null;
+        }
+
+        if (time() - (int) ($metadata['created_at'] ?? 0) > self::TEMP_IMPORT_TTL_SECONDS) {
+            Storage::delete($path);
+            $request->session()->forget($sessionKey);
+
+            return null;
+        }
+
+        return Storage::exists($path) ? $path : null;
+    }
+
+    private function importSessionKey(string $uploadToken): string
+    {
+        return 'slaughter_imports.'.$uploadToken;
     }
 
     public function destroy(Request $request, Flock $flock, FlockSlaughterRecord $slaughterRecord): RedirectResponse
